@@ -9,15 +9,9 @@
 
 #if __STDC_HOSTED__ == 1
 # include <memory>
-# include <cstring>
 # include <cassert>
 # define FTL_DEFAULT_ALLOCATOR std::allocator<T>
 #else
-// this is not required by the standard, but is de-facto available
-// even with compilers outside the usual clang/gcc/msvc, and we
-// basically need memmove
-# include <string.h>
-
 // TODO:  we probably want our own assert since this is not in
 // standard either, both gcc and clang provide it in freestanding
 // though
