@@ -55,9 +55,7 @@ Uses `ftl::static_storage<128>` as default "Allocator" on freestanding
 
 Licence
 -------
-The licence information is contained at the *end* of the files.
-
-Generally, the files hold MIT licence, and as they are header-only,
-you are good as long as you don't explicitly modify or remove the licence
-from those files no matter your use.
+The licence information is also contained at the *end* of the files,
+so generally, as they are header-only, you are good as long as you don't
+explicitly modify or remove the licence from those files no matter your use.
 
