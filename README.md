@@ -1,6 +1,10 @@
 Freestanding template library
 =============================
-Provides freestanding-compatible template types for common use cases
+Provides freestanding-compatible template types for common use cases.
+
+Note that nothing prevents you from using these in non-freestanding
+scenarios either, they're just made to work in freestanding subset
+as well.
 
 Uses concepts and requires -statements, and doesn't shy away from
 C++20 features in general, so your compiler needs to support those

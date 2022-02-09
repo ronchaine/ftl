@@ -3,11 +3,8 @@
 
 #include <type_traits>
 
-// FIXME: stdexcept is not necessarily available in freestanding,
-//        maybe define our own "out of range"
-#include <stdexcept>
-
 #if __STDC_HOSTED__ == 1
+# include <stdexcept>
 # include <memory>
 # include <cassert>
 # define FTL_DEFAULT_ALLOCATOR std::allocator<T>
@@ -24,6 +21,7 @@ namespace ftl
     template <size_t StorageBytes>
     struct static_storage
     {
+        static_assert(StorageBytes != 0);
         constexpr static size_t size = StorageBytes;
     };
 
@@ -50,20 +48,20 @@ namespace ftl
             constexpr static size_t initial_size    = 2 << initial_power;
             constexpr static size_t grow_factor     = 2;
 
-            inline void grow(size_t& read_head, size_t& write_head) {
+            inline void grow(T*& read_head, T*& write_head) {
                 T* old_data_ptr = data_ptr;
                 const size_t new_size = data_size == 0 ? initial_size : data_size * grow_factor;
 
                 T* new_data_ptr = this->allocator.allocate(new_size);
 
                 size_t it = 0;
-                while (!(read_head == write_head)) {
-                    new_data_ptr[it++] = static_cast<T&&>(data_ptr[read_head]);
+                while (read_head != write_head) {
+                    new_data_ptr[it++] = static_cast<T&&>(*read_head);
                     read_head = read_head == data_size - 1 ? 0 : read_head + 1;
                 }
 
-                read_head = 0;
-                write_head = it;
+                read_head = new_data_ptr;
+                write_head = new_data_ptr + it;
 
                 allocator.deallocate(old_data_ptr, data_size);
                 data_ptr = new_data_ptr;
@@ -86,8 +84,7 @@ namespace ftl
             constexpr ring_buffer_details() noexcept = default;
 
         protected:
-            T                       buffer_store[StaticSize] {};
-            T*                      data_ptr = buffer_store;
+            T                       data_ptr[StaticSize] {};
     };
 
     template <typename T, typename Allocator = FTL_DEFAULT_ALLOCATOR>
@@ -100,10 +97,10 @@ namespace ftl
             using reference         = T&;
             using const_reference   = const T&;
 
-            template <bool is_const>
-            struct rb_iterator;
-
             using ring_buffer_details<T, Allocator>::is_dynamic;
+
+            template <bool is_const>
+            class rb_iterator;
 
             using iterator          = rb_iterator<false>;
             using const_iterator    = rb_iterator<true>;
@@ -111,13 +108,18 @@ namespace ftl
             constexpr ring_buffer() = default;
 
             // modifiers
-            constexpr void swap(ring_buffer& rhs) noexcept { swap(*this, rhs); }
             constexpr void push(const T& elem);
             constexpr void push(T&& elem);
+
+            constexpr void push_overwrite(const T& elem);
+            constexpr void push_overwrite(T&& elem);
+
+            constexpr void swap(ring_buffer& rhs) noexcept { swap(*this, rhs); }
+
             [[nodiscard]] constexpr T&& pop();
 
             // queries
-            [[nodiscard]] constexpr size_t capacity() const noexcept { return data_size; }
+            [[nodiscard]] constexpr size_type capacity() const noexcept { return data_size; }
             [[nodiscard]] constexpr bool is_empty() const noexcept { return write_head == read_head; }
             [[nodiscard]] constexpr bool is_full() const noexcept { return buffer_out_of_space(); }
 
@@ -125,15 +127,10 @@ namespace ftl
             using ring_buffer_details<T, Allocator>::data_size;
             using ring_buffer_details<T, Allocator>::data_ptr;
 
-            // requires mod = 2^n
-            constexpr static size_type reduce(size_type x, size_type mod) noexcept {
-                return x & (mod - 1);
-            }
-
             inline bool buffer_out_of_space() const noexcept;
 
-            size_type               read_head       = 0;
-            size_type               write_head      = 0;
+            T* read_head    = data_ptr;
+            T* write_head   = data_ptr;
     };
 
     template <typename T, typename A>
@@ -141,7 +138,7 @@ namespace ftl
         if (data_size == 0)
             return true;
 
-        if (reduce(write_head + 1, data_size) == read_head)
+        if (write_head == nullptr)
             return true;
 
         return false;
@@ -149,7 +146,8 @@ namespace ftl
 
     template <typename T, typename A>
     constexpr void ring_buffer<T,A>::push(const T& elem) {
-        push(elem);
+        T movable = elem;
+        push(static_cast<T&&>(movable));
     }
 
     template <typename T, typename A>
@@ -162,8 +160,10 @@ namespace ftl
             }
         }
 
-        data_ptr[write_head] = elem;
-        write_head = write_head == data_size - 1 ? 0 : write_head + 1;
+        *write_head = elem;
+        write_head = write_head == data_ptr + data_size - 1 ? data_ptr : write_head + 1;
+        if (write_head == read_head)
+            write_head = nullptr;
     }
 
     template <typename T, typename A>
@@ -172,8 +172,12 @@ namespace ftl
             if (is_empty()) throw std::out_of_range{"read from empty ring buffer"};
         #endif
         assert(not is_empty());
-        T&& val = static_cast<T&&>(data_ptr[read_head]);
-        read_head = read_head == data_size - 1 ? 0 : read_head + 1;
+        T&& val = static_cast<T&&>(*read_head);
+
+        if (write_head == nullptr)
+            write_head = read_head;
+
+        read_head = read_head == data_ptr + data_size - 1 ? data_ptr : read_head + 1;
         return static_cast<T&&>(val);
     }
 
@@ -183,6 +187,28 @@ namespace ftl
         a = b;
         b = tmp;
     }
+
+    template <typename T, typename A> template <bool is_const>
+    class ring_buffer<T,A>::rb_iterator
+    {
+        public:
+            // TODO: Make sure we have something for std::forward_iterator_tag if
+            //       on freestanding (works with gcc and clang currently)
+
+            // The iterator is LegacyBidirectionalIterator, but not bidirectional_iterator
+            // for the C++ standard
+            using iterator_category = std::bidirectional_iterator_tag;
+            using value_type = T;
+            using difference_type = std::ptrdiff_t;
+            using pointer = T*;
+            using reference = T&;
+
+            // LegacyIterator requirements
+            constexpr reference operator*() { return *ptr; };
+
+        private:
+            T* ptr;
+    };
 }
 
 #endif
