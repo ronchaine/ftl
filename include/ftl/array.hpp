@@ -179,7 +179,7 @@ namespace ftl
         for (T& e : data_array)
             e = value;
     }
-    
+
     template <typename T, std::size_t... Dimensions>
     constexpr void array<T, Dimensions...>::swap(array& other) noexcept(std::is_nothrow_swappable_v<T>)
     {
