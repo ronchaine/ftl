@@ -22,41 +22,138 @@ namespace ftl
 {
     namespace detail {
         // These are just so that the following specialisations are more readable
-        constexpr static bool REFERENCE = true;
+        // constexpr static bool REFERENCE = true;
         constexpr static bool NOT_REFERENCE = false;
 
         constexpr static bool TRIVIALLY_DESTRUCTIBLE = true;
         constexpr static bool NOT_TRIVIALLY_DESTRUCTIBLE = false;
 
+        // for providing decent-ish error message if allocator wasn't good enough
+        template <ftl::any_good_enough_allocator T>
+        constexpr void test_allocator_suitability() {}
+
         template <typename T,
-                  typename Unknown,
+                  typename U,
                   bool IsReference = std::is_reference<T>::value,
                   bool IsTriviallyDestructible = std::is_trivially_destructible<T>::value>
         struct ring_buffer_storage
         {
-            static_assert(always_false<T>, "Invalid argument for ring buffer's storage");
+            static_assert(test_allocator_suitability<U>(), "Could not use provided storage type as allocator or static storage");
+            static_assert(not IsReference, "Reference storage not implemented");
         };
 
-        template <typename T, Any_good_enough_allocator Allocator, bool Ref, bool CallDestructor>
-        struct ring_buffer_storage<T, Allocator, Ref, CallDestructor>
+        template <typename T, any_good_enough_allocator Allocator, bool CallDestructor>
+        struct ring_buffer_storage<T, Allocator, NOT_REFERENCE, CallDestructor>
         {
-            constexpr static bool   is_dynamic = true;
+            public:
+                using allocator_traits  = typename std::conditional<has_allocator_traits<Allocator>(),
+                                          std::allocator_traits<Allocator>,
+                                          Allocator>::type;
 
-            using value_type        = T;
-            using allocator_type    = Allocator;
-            using pointer           = typename Allocator::pointer;
+                static_assert(std::is_same_v<T, typename allocator_traits::value_type>);
 
-            [[nodiscard]] constexpr allocator_type get_allocator() noexcept { return allocator; }
+                using value_type        = T;
+                using allocator_type    = typename allocator_traits::allocator_type;
+                using pointer           = typename allocator_traits::pointer;
+                using const_pointer     = const T* const; // FIXME: typename allocator_traits::const_pointer;
+                using size_type         = typename allocator_traits::size_type;
 
-            allocator_type allocator;
-        };
+                constexpr static bool   is_dynamic = true;
 
-        template <typename T, size_t StaticSize, bool Dummy>
-        struct ring_buffer_storage<T, ftl::static_storage<StaticSize>, REFERENCE, Dummy>
-        {
-            constexpr static bool       is_dynamic = false;
+                constexpr ring_buffer_storage() noexcept = default;
+                constexpr ~ring_buffer_storage() {
+                    if (data_begin == nullptr)
+                        return;
 
-            constexpr static size_t     data_size = StaticSize;
+                    if constexpr(not std::is_trivially_destructible_v<value_type>) {
+                        if (read_head == nullptr)
+                            return;
+
+                        if (write_head == nullptr)
+                            write_head = read_head == data() + get_capacity() - 1 ? data() : read_head + 1;
+
+                        while(write_head != read_head) {
+                            get_read_head()->~T();
+                            advance_read_head();
+                        }
+                    }
+
+                    allocator.deallocate(data_begin, get_size());
+                };
+
+                constexpr inline bool is_empty() const noexcept { return (write_head == read_head) || read_head == nullptr; }
+                constexpr inline bool is_full() const noexcept { return write_head == nullptr; }
+
+                constexpr inline void advance_write_head() noexcept {
+                    write_head = write_head == data() + get_capacity() - 1 ? data() : write_head + 1;
+                    if (write_head == read_head)
+                        write_head = nullptr;
+                }
+
+                constexpr inline void advance_read_head() noexcept {
+                    read_head = read_head == data() + get_capacity() - 1 ? data() : read_head + 1;
+                }
+
+                constexpr inline void release() const noexcept {
+                    if constexpr(not std::is_trivially_destructible_v<T>)
+                        get_read_head()->~T();
+                }
+
+                constexpr pointer data() noexcept { return data_begin; }
+                constexpr size_type get_capacity() const noexcept { return (data_end - data_begin); }
+                constexpr size_type get_size() const noexcept {
+                    if (write_head == nullptr)
+                        return get_capacity();
+
+                    if (write_head == read_head || read_head == nullptr)
+                        return 0;
+                    return write_head > read_head
+                        ? static_cast<size_type>(write_head - read_head)
+                        : static_cast<size_type>(get_capacity() - (read_head - write_head));
+                }
+
+                [[nodiscard]] constexpr allocator_type get_allocator() noexcept { return allocator; }
+
+            protected:
+                constexpr static size_t initial_power   = 3;
+                constexpr static size_t initial_size    = 2 << (initial_power - 1);
+                constexpr static size_t grow_factor     = 2;
+
+                inline void grow() {
+                    pointer old_data_begin = data_begin;
+
+                    const size_t new_size = get_capacity() == 0 ? initial_size : get_capacity() * grow_factor;
+
+                    T* new_data_ptr = allocator.allocate(new_size);
+
+                    size_t it = 0;
+                    if (old_data_begin != nullptr) {
+                        while (read_head != write_head) {
+                            new_data_ptr[it++] = static_cast<T&&>(*read_head);
+                            advance_read_head();
+                        }
+                    }
+                    data_begin = new_data_ptr;
+                    data_end = new_data_ptr + new_size;
+
+                    read_head = data_begin;
+                    write_head = data_begin + it;
+                }
+
+                constexpr inline pointer& get_write_head() noexcept { return write_head; }
+                constexpr inline pointer& get_read_head() noexcept { return read_head; }
+
+                constexpr inline const_pointer& get_write_head() const noexcept { return write_head; }
+                constexpr inline const_pointer& get_read_head() const noexcept { return read_head; }
+
+            private:
+                pointer read_head = nullptr;
+                pointer write_head = nullptr;
+
+                pointer data_begin = nullptr;
+                pointer data_end = nullptr;
+
+                allocator_type allocator;
         };
 
         template <typename T, size_t StaticSize>
@@ -92,7 +189,16 @@ namespace ftl
 
                 constexpr pointer data() noexcept { return std::launder(reinterpret_cast<pointer>(&store)); }
                 constexpr size_type get_capacity() const noexcept { return StaticSize; }
-                constexpr size_type get_size() const noexcept { return StaticSize; }
+                constexpr size_type get_size() const noexcept {
+                    if (write_head == nullptr)
+                        return StaticSize;
+
+                    if (write_head == read_head || read_head == nullptr)
+                        return 0;
+                    return write_head > read_head
+                        ? static_cast<size_type>(write_head - read_head)
+                        : static_cast<size_type>(StaticSize - (read_head - write_head));
+                }
 
             protected:
                 constexpr inline pointer& get_write_head() noexcept { return write_head; }
@@ -138,10 +244,8 @@ namespace ftl
                         return;
                     }
 
-                    if (write_head == nullptr) {
-                        // TODO: handle read_head == nullptr
+                    if (write_head == nullptr)
                         write_head = read_head == data() + data_size - 1 ? data() : read_head + 1;
-                    }
 
                     while(write_head != read_head) {
                         get_read_head()->~T();
@@ -155,6 +259,15 @@ namespace ftl
 
                 constexpr pointer data() noexcept { return std::launder(reinterpret_cast<pointer>(&store)); }
                 constexpr size_type get_capacity() const noexcept { return StaticSize; }
+                constexpr size_type get_size() const noexcept {
+                    if (write_head == nullptr)
+                        return StaticSize;
+                    if (write_head == read_head || read_head == nullptr)
+                        return 0;
+                    return write_head > read_head
+                        ? static_cast<size_type>(write_head - read_head)
+                        : static_cast<size_type>(StaticSize - (read_head - write_head));
+                }
 
             protected:
                 constexpr inline pointer& get_write_head() noexcept { return write_head; }
@@ -174,7 +287,9 @@ namespace ftl
         struct ring_buffer_details : ring_buffer_storage<T, Storage>
         {
             using value_type = typename ring_buffer_storage<T, Storage>::value_type;
+            using size_type = typename ring_buffer_storage<T, Storage>::size_type;
 
+            using ring_buffer_storage<T, Storage>::is_dynamic;
             using ring_buffer_storage<T, Storage>::get_write_head;
             using ring_buffer_storage<T, Storage>::get_read_head;
             using ring_buffer_storage<T, Storage>::advance_write_head;
@@ -190,20 +305,24 @@ namespace ftl
                 if (get_read_head() == nullptr) [[unlikely]]
                     get_read_head() = data();
 
-                if (is_full()) {
-                    if constexpr(not allow_overwrite) {
-                        #ifdef __cpp_exceptions
-                            throw std::out_of_range("ring buffer full");
-                        #endif
-                        assert(not is_full());
-                    }
+                if constexpr(is_dynamic) {
+                    if (is_full())
+                        ring_buffer_storage<T, Storage>::grow();
+                } else {
+                    if (is_full()) {
+                        if constexpr(not allow_overwrite) {
+                            #ifdef __cpp_exceptions
+                                throw std::out_of_range("ring buffer full");
+                            #endif
+                            assert(not is_full());
+                        }
 
-                    // just overwrite if NDEBUG and no exceptions
-                    release();
-                    get_write_head() = get_read_head();
-                    advance_read_head();
+                        // just overwrite if NDEBUG and no exceptions
+                        release();
+                        get_write_head() = get_read_head();
+                        advance_read_head();
+                    }
                 }
-                // TODO: figure out if this move could be elided
                 ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_FORWARD(elem) };
                 advance_write_head();
             }
@@ -224,6 +343,15 @@ namespace ftl
                 advance_read_head();
                 return FTL_MOVE(val);
             }
+
+            constexpr bool is_contiguous() const noexcept {
+                if (get_read_head() == nullptr)
+                    return true;
+                else if (get_write_head() == nullptr)
+                    return get_read_head() == data();
+                else
+                    return get_read_head() < get_write_head();
+            };
         };
     }
 
@@ -233,6 +361,9 @@ namespace ftl
         public:
             using value_type        = T;
             using size_type         = std::size_t;
+            using pointer           = typename detail::ring_buffer_storage<T, Storage>::pointer;
+
+            using allocator_type    = typename detail::ring_buffer_storage<T, Storage>::allocator_type;
 
             template <bool is_const>
             class rb_iterator;
@@ -264,6 +395,8 @@ namespace ftl
             [[nodiscard]] constexpr size_type capacity() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_capacity(); }
             [[nodiscard]] constexpr bool is_empty() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_empty(); }
             [[nodiscard]] constexpr bool is_full() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_full(); }
+
+            [[nodiscard]] constexpr bool is_contiguous() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_contiguous(); }
 
     };
 }

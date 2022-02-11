@@ -14,7 +14,9 @@ array_tests = executable(
 )
 
 ringbuffer_test_sources = [
-  'ring_buffer/ring_buffer.cpp'
+  'ring_buffer/ring_buffer_static.cpp',
+  'ring_buffer/ring_buffer_allocated.cpp',
+  'ring_buffer/ring_buffer_common.cpp',
 ]
 
 ringbuffer_tests = executable(

@@ -43,7 +43,7 @@ namespace ftl_test
         char strptr[N];
     };
 
-    template <ct_string_wrap id>
+    template <ct_string_wrap id, typename T = void>
     struct counted_ctr_dtr {
         counted_ctr_dtr() { default_constructed++; }
         counted_ctr_dtr(const counted_ctr_dtr&) { copy_constructed++; }

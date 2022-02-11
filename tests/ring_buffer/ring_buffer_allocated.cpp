@@ -5,109 +5,95 @@
 #include <ftl/ring_buffer.hpp>
 
 template <typename T>
-using static_ring_buffer = ftl::ring_buffer<T, ftl::static_storage<16>>;
+using std_alloc_ring_buffer = ftl::ring_buffer<T, std::allocator<T>>;
 
-TEST_SUITE("ftl::ring buffer with static_storage") {
+TEST_SUITE("ftl::ring buffer with allocator") {
     TEST_CASE("static requirements (builtin value)") {
         SUBCASE("ring buffer is nothrow constructible and assignable") {
-            CHECK(std::is_nothrow_constructible<static_ring_buffer<int>>::value);
-            CHECK(std::is_nothrow_copy_constructible<static_ring_buffer<int>>::value);
-            CHECK(std::is_nothrow_move_constructible<static_ring_buffer<int>>::value);
-            CHECK(std::is_nothrow_copy_assignable<static_ring_buffer<int>>::value);
-            CHECK(std::is_nothrow_move_assignable<static_ring_buffer<int>>::value);
-        }
-
-        SUBCASE("triviality") {
-            CHECK(std::is_trivially_copy_constructible<static_ring_buffer<int>>::value);
-            CHECK(std::is_trivially_move_constructible<static_ring_buffer<int>>::value);
-            CHECK(std::is_trivially_copy_assignable<static_ring_buffer<int>>::value);
-            CHECK(std::is_trivially_move_assignable<static_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_constructible<std_alloc_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_copy_constructible<std_alloc_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_move_constructible<std_alloc_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_copy_assignable<std_alloc_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_move_assignable<std_alloc_ring_buffer<int>>::value);
         }
     }
 
     TEST_CASE("static requirements (trivial value)") {
         SUBCASE("ring buffer is nothrow constructible and assignable") {
-            CHECK(std::is_nothrow_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_nothrow_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_nothrow_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_nothrow_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_nothrow_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_constructible<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_copy_constructible<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_move_constructible<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_copy_assignable<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_move_assignable<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
         }
 
-        SUBCASE("ring buffer is trivially copyable / movable") {
-            CHECK(std::is_trivially_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_trivially_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_trivially_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-            CHECK(std::is_trivially_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+        SUBCASE("ring buffer is trivially assignable") {
+            CHECK(std::is_trivially_copy_assignable<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_trivially_move_assignable<std_alloc_ring_buffer<ftl_test::trivial_type>>::value);
         }
     }
 
     TEST_CASE("static requirements (non-trivial value)") {
         SUBCASE("ring buffer is copyable / movable") {
-            CHECK(std::is_copy_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-            CHECK(std::is_move_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-            CHECK(std::is_copy_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-            CHECK(std::is_move_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_copy_constructible<std_alloc_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_move_constructible<std_alloc_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_copy_assignable<std_alloc_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_move_assignable<std_alloc_ring_buffer<ftl_test::nontrivial_type>>::value);
         }
     }
 
-    TEST_CASE("memory overhead") {
-        ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
-        ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
-        ftl::ring_buffer<char, ftl::static_storage<8>> test_buf_c8;
+    TEST_CASE("sizeof(ring_buffer) does not vary by value_type") {
+        std_alloc_ring_buffer<int> test_buf_int;
+        std_alloc_ring_buffer<char> test_buf_char;
+        std_alloc_ring_buffer<std::string> test_buf_string;
 
-        ftl::ring_buffer<std::string, ftl::static_storage<8>> test_buf_s8;
-
-        // Overhead for static ring buf at most two pointers + the size of the storage
-        CHECK(sizeof(test_buf_i16) <= sizeof(int) * 16 + sizeof(int*) * 2);
-        CHECK(sizeof(test_buf_i32) <= sizeof(int) * 32 + sizeof(int*) * 2);
-        CHECK(sizeof(test_buf_c8) <= sizeof(char) * 8 + sizeof(char*) * 2);
-        CHECK(sizeof(test_buf_s8) <= sizeof(std::string) * 8 + sizeof(std::string*) * 2);
-
-        // Check we remembered to actually include the bookkeeping pointers and init the array to right size
-        REQUIRE(sizeof(test_buf_i16) > sizeof(int) * 16);
-        REQUIRE(sizeof(test_buf_i32) > sizeof(int) * 32);
-        REQUIRE(sizeof(test_buf_c8) > sizeof(char) * 8);
-        REQUIRE(sizeof(test_buf_s8) > sizeof(std::string) * 8);
+        CHECK(sizeof(test_buf_int) == sizeof(test_buf_string));
+        CHECK(sizeof(test_buf_int) == sizeof(test_buf_char));
     }
 
     TEST_CASE("capacity, size and emptiness / fullness") {
-        SUBCASE("Default-constructed ring buffer is empty") {
-            ftl::ring_buffer<char, ftl::static_storage<8>> fresh_unmodified_buffer;
-            CHECK(fresh_unmodified_buffer.is_empty());
-            CHECK(not fresh_unmodified_buffer.is_full());
-        }
+        SUBCASE("Default-constructed ring buffer is empty and full, allocation on first push") {
+            std_alloc_ring_buffer<int> test_buffer;
+            CHECK(test_buffer.is_empty());
+            CHECK(test_buffer.is_full());
+            CHECK(test_buffer.capacity() == 0);
 
-        SUBCASE("Default-constructed ring buffer has the capacity requested") {
-            ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
-            ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
-            ftl::ring_buffer<char, ftl::static_storage<8>> test_buf_c8;
-            ftl::ring_buffer<std::string, ftl::static_storage<8>> test_buf_s8;
-
-            CHECK(test_buf_i16.capacity() == 16);
-            CHECK(test_buf_i32.capacity() == 32);
-            CHECK(test_buf_c8.capacity() == 8);
-            CHECK(test_buf_s8.capacity() == 8);
+            test_buffer.push(1);
+            CHECK(test_buffer.capacity() > 0);
+            CHECK(not test_buffer.is_empty());
+            CHECK(not test_buffer.is_full());
         }
 
         SUBCASE("Filling a buffer makes it full and reading frees space") {
-            ftl::ring_buffer<int, ftl::static_storage<4>> test_buf_i4;
-            for (int i = 0; i < static_cast<int>(test_buf_i4.capacity()); ++i)
-                test_buf_i4.push(i);
+            std_alloc_ring_buffer<int> test_buffer;
 
-            CHECK(test_buf_i4.is_full());
+            test_buffer.push(0); // init the buffer
+            for (int i = 1; i < static_cast<int>(test_buffer.capacity()); ++i)
+                test_buffer.push(i);
 
-            int i = test_buf_i4.pop();
+            CHECK(test_buffer.is_full());
+            CHECK(not test_buffer.is_empty());
+
+            int i = test_buffer.pop();
             (void)i;
 
-            CHECK(not test_buf_i4.is_full());
+            CHECK(not test_buffer.is_full());
+        }
+
+        SUBCASE("For full buffer size() == capacity()") {
+            std_alloc_ring_buffer<int> buffer;
+
+            REQUIRE(buffer.is_full());
+            CHECK(buffer.size() == buffer.capacity());
         }
     }
 
+    // TODO: It would be nice to make this a test case template at some point,
+    //       this is repeated pretty much verbatim in ring_buffer_allocated.cpp
     TEST_CASE("construction / destruction of contained objects") {
         SUBCASE("Allocating storage doesn't cause object initialisation") {
-            using counter_type = ftl_test::counted_ctr_dtr<"srb-cdc-0">;
-            ftl::ring_buffer<counter_type, ftl::static_storage<16>> test_buf;
+            using counter_type = ftl_test::counted_ctr_dtr<"arb-cdc-0">;
+            std_alloc_ring_buffer<counter_type> test_buf;
 
             REQUIRE(counter_type::default_constructed == 0);
             REQUIRE(counter_type::copy_constructed == 0);
@@ -116,9 +102,9 @@ TEST_SUITE("ftl::ring buffer with static_storage") {
         }
 
         SUBCASE("push/pop with copy semantics") {
-            ftl_test::counted_ctr_dtr<"srb-pp-copy"> counter;
+            ftl_test::counted_ctr_dtr<"arb-pp-copy"> counter;
             {
-                ftl::ring_buffer<decltype(counter), ftl::static_storage<6>> test_buf;
+                std_alloc_ring_buffer<decltype(counter)> test_buf;
 
                 REQUIRE(counter.default_constructed == 1);
                 REQUIRE(counter.copy_constructed == 0);
@@ -153,9 +139,9 @@ TEST_SUITE("ftl::ring buffer with static_storage") {
         }
 
         SUBCASE("push/pop with move semantics") {
-            ftl_test::counted_ctr_dtr<"srb-pp-move"> counter;
+            ftl_test::counted_ctr_dtr<"arb-pp-move"> counter;
             {
-                ftl::ring_buffer<decltype(counter), ftl::static_storage<6>> test_buf;
+                std_alloc_ring_buffer<decltype(counter)> test_buf;
 
                 REQUIRE(counter.default_constructed == 1);
                 REQUIRE(counter.copy_constructed == 0);
@@ -190,7 +176,6 @@ TEST_SUITE("ftl::ring buffer with static_storage") {
         }
     }
 }
-
 /*
     Copyright 2022 Jari Ronkainen
 

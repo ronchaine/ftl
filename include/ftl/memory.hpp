@@ -11,21 +11,66 @@
 # define FTL_DEFAULT_ALLOCATOR ftl::static_storage<64>
 #endif
 
+// I don't know how standard this is, but it allows to check
+// if allocator_traits is defined by checking its completeness
+namespace std {
+    template< class Alloc > struct allocator_traits;
+}
+
 namespace ftl
 {
-    template <typename T>
-    concept Any_good_enough_allocator = requires(T t) {
-        { T::pointer };
-        { T::allocate() } -> std::same_as<typename T::pointer>;
-        { T::deallocate() };
-    };
-
     template <std::size_t StorageBytes>
     struct static_storage
     {
         static_assert(StorageBytes != 0);
         constexpr static std::size_t size = StorageBytes;
     };
+
+    template<typename, typename = void> [[maybe_unused]]
+    constexpr static bool is_type_complete_v = false;
+
+    template<typename T> [[maybe_unused]]
+    constexpr static bool is_type_complete_v<T, std::void_t<decltype(sizeof(T))>> = true;
+
+    template <typename T>
+    consteval static bool is_type_complete() noexcept { return is_type_complete_v<T>; }
+
+    template <typename T>
+    concept any_with_required_allocator_traits = is_type_complete_v<T> && std::is_compound_v<T> && requires(T t) {
+        typename T::value_type;
+
+        // TODO: check doing this with declval or something, I tried it
+        //        but I was tired and might've messed up the syntax...
+        { t.allocate(0) } -> std::same_as<typename std::allocator_traits<T>::pointer>;
+        { t.deallocate(nullptr, 0) };
+
+        typename std::allocator_traits<T>::allocator_type;
+        typename std::allocator_traits<T>::value_type;
+        typename std::allocator_traits<T>::pointer;
+        typename std::allocator_traits<T>::const_pointer;
+        typename std::allocator_traits<T>::size_type;
+    };
+
+    template <typename T>
+    consteval static bool has_allocator_traits() noexcept { return false; }
+
+    template <any_with_required_allocator_traits T>
+    consteval static bool has_allocator_traits() noexcept { return true; }
+
+    template <typename T>
+    concept suitable_raw_allocator = std::is_compound_v<T> && requires(T t) {
+        typename T::allocator_type;
+        typename T::value_type;
+        typename T::pointer;
+        typename T::const_pointer;
+        typename T::size_type;
+
+        { t.allocate() } -> std::same_as<typename T::pointer>;
+        { t.deallocate(nullptr, 0) };
+    };
+
+    template <typename T>
+    concept any_good_enough_allocator = any_with_required_allocator_traits<T> || suitable_raw_allocator<T>;
 }
 
 #endif
