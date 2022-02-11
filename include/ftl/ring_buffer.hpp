@@ -5,7 +5,7 @@
 #include <new>
 
 #include "memory.hpp"
-#include "utility_macros.hpp"
+#include "utility.hpp"
 
 #if __STDC_HOSTED__ == 1
 # include <stdexcept>
@@ -92,6 +92,7 @@ namespace ftl
 
                 constexpr pointer data() noexcept { return std::launder(reinterpret_cast<pointer>(&store)); }
                 constexpr size_type get_capacity() const noexcept { return StaticSize; }
+                constexpr size_type get_size() const noexcept { return StaticSize; }
 
             protected:
                 constexpr inline pointer& get_write_head() noexcept { return write_head; }

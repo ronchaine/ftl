@@ -30,14 +30,14 @@ Dynamically sized containers can use allocators.  On non-freestanding
 environments, the default allocator is `std::allocator`.
 
 In addition, there is a type `ftl::static_storage<size_t>` that can
-be used instead of an allocator, that embeds a static buffer of requested
-size into the container type itself.  It is used as a default on
-freestanding environments.
+be used instead of an allocator, instructing it to embed a static buffer
+of requested size into the container type itself.  It is used as a default
+on freestanding environments.
 
 
 Array
 -----
-Defined in `array.hpp`, uses `utility_macros.hpp` and `hash.hpp`
+Defined in `array.hpp`, uses `utility.hpp` and `hash.hpp`
 
 Similar to `std::array`, but can be multi-dimensional.  Does not use
 allocators or use heap memory.
@@ -45,7 +45,7 @@ allocators or use heap memory.
 
 Ring buffer
 -----------
-Defined in `ring_buffer.hpp`, uses `utility_macros.hpp` and `memory.hpp`
+Defined in `ring_buffer.hpp`, uses `utility.hpp` and `memory.hpp`
 
 Very simple ring buffer with `push` and `pop`.  Resizes itself
 if allocator is given when unread elements fill the entire

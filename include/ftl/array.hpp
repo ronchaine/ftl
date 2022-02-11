@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <type_traits>
 
-#include "utility_macros.hpp"
+#include "utility.hpp"
 #include "hash.hpp"
 
 namespace ftl
