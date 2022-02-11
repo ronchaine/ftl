@@ -7,8 +7,6 @@
 #include "memory.hpp"
 #include "utility_macros.hpp"
 
-#define PRINT_DEBUG
-
 #if __STDC_HOSTED__ == 1
 # include <stdexcept>
 # include <memory>
@@ -186,41 +184,26 @@ namespace ftl
             constexpr bool is_empty() const noexcept { return (get_write_head() == get_read_head()) || get_read_head() == nullptr; }
             constexpr bool is_full() const noexcept { return get_write_head() == nullptr; }
 
-            constexpr void construct(value_type&& elem) {
-                PRINT_DEBUG("at start of construct");
+            template <typename U, bool allow_overwrite = false> requires std::is_convertible_v<U, T>
+            constexpr void construct(U&& elem) {
                 if (get_read_head() == nullptr) [[unlikely]]
                     get_read_head() = data();
 
                 if (is_full()) {
-                    #ifdef __cpp_exceptions
-                        throw std::out_of_range("ring buffer full");
-                    #endif
-                    assert(not is_full()); 
+                    if constexpr(not allow_overwrite) {
+                        #ifdef __cpp_exceptions
+                            throw std::out_of_range("ring buffer full");
+                        #endif
+                        assert(not is_full());
+                    }
 
                     // just overwrite if NDEBUG and no exceptions
                     release();
                     get_write_head() = get_read_head();
                     advance_read_head();
                 }
-                PRINT_DEBUG("before placement new");
                 // TODO: figure out if this move could be elided
                 ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_FORWARD(elem) };
-                advance_write_head();
-                PRINT_DEBUG("at end of construct");
-            }
-
-            constexpr void construct_overwrite(value_type&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) {
-                if (get_read_head() == nullptr) [[unlikely]]
-                    get_read_head() = data();
-
-                if (is_full()) {
-                    release();
-                    get_write_head() = get_read_head();
-                    advance_read_head();
-                }
-
-                // TODO: figure out if this move could be elided
-                ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_MOVE(elem) };
                 advance_write_head();
             }
 
@@ -230,9 +213,12 @@ namespace ftl
                 #endif
                 assert(not is_empty());
 
+                // Does this need launder?
                 T&& val = FTL_MOVE(*(get_read_head()));
                 if (get_write_head() == nullptr)
                     get_write_head() = get_read_head();
+
+                release();
 
                 advance_read_head();
                 return FTL_MOVE(val);
@@ -262,33 +248,22 @@ namespace ftl
             constexpr const_iterator end() const;
 
             // modifiers
-            constexpr void push(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(T{elem}); }
-            constexpr void push(T&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->construct(FTL_MOVE(elem)); }
+            template <typename U> requires std::is_convertible_v<U, T>
+            constexpr void push(U&& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(FTL_FORWARD(elem)); }
 
-            /*
-            template <typename... Args> requires all_of_type<Args, T>
-            constexpr void push(Args&&...); // insert multiple
-
-            template <typename... Args>
-            constexpr void push(Args&&...); // in-place construction
-            */
-
-            constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct_overwrite(elem); }
-            constexpr void push_overwrite(T&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->construct_overwrite(FTL_MOVE(elem)); }
-
-            /*
-            template <typename... Args>
-            constexpr void push_overwrite(Args&&...); // in-place construction
-            */
+            template <typename U> requires std::is_convertible_v<U, T>
+            constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
 
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
-            [[nodiscard]] constexpr T&& pop() { return this->read_delete(); } ;
+            [[nodiscard]] constexpr T&& pop() { return this->read_delete(); }
 
             // queries
+            [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }
             [[nodiscard]] constexpr size_type capacity() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_capacity(); }
             [[nodiscard]] constexpr bool is_empty() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_empty(); }
             [[nodiscard]] constexpr bool is_full() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_full(); }
+
     };
 }
 

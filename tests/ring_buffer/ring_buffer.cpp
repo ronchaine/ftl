@@ -7,79 +7,51 @@
 template <typename T>
 using static_ring_buffer = ftl::ring_buffer<T, ftl::static_storage<16>>;
 
-TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
-    SUBCASE("constructibility / assignability requirements (builtin value)") {
-        REQUIRE(std::is_nothrow_constructible<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_nothrow_copy_constructible<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_nothrow_move_constructible<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_nothrow_copy_assignable<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_nothrow_move_assignable<static_ring_buffer<int>>::value);
-
-        REQUIRE(std::is_trivially_copy_constructible<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_trivially_move_constructible<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_trivially_copy_assignable<static_ring_buffer<int>>::value);
-        REQUIRE(std::is_trivially_move_assignable<static_ring_buffer<int>>::value);
-    }
-
-    SUBCASE("constructibility / assignability requirements (trivial value)") {
-        REQUIRE(std::is_nothrow_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_nothrow_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_nothrow_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_nothrow_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_nothrow_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-
-        REQUIRE(std::is_trivially_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_trivially_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_trivially_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-        REQUIRE(std::is_trivially_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
-    }
-
-    SUBCASE("constructibility / assignability requirements (non-trivial value)") {
-        REQUIRE(std::is_nothrow_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-        REQUIRE(std::is_copy_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-        REQUIRE(std::is_move_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-        REQUIRE(std::is_copy_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-        REQUIRE(std::is_move_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
-    }
-
-    SUBCASE("properly destroying contained objects") {
-        // causes default_constructed to increase to 1
-        ftl_test::counted_ctr_dtr<"static ftl::ring_buffer tests"> counter;
-
-        ftl::ring_buffer<decltype(counter), ftl::static_storage<16>> test_buf;
-
-        // elements in static ring buffer are not default_constructed
-        REQUIRE(counter.default_constructed == 1);
-
-        /*
-        // Verify initial state
-        REQUIRE(counter.copy_constructed == 0);
-        REQUIRE(counter.move_constructed == 0);
-        REQUIRE(counter.destroyed == 0);
-
-        {
-            test_buf.push(counter);
-            REQUIRE(counter.default_constructed == 1);
-            REQUIRE(counter.copy_constructed == 1);
-            REQUIRE(counter.move_constructed == 0);
-
-            test_buf.push(static_cast<decltype(counter)&&>(counter));
-            REQUIRE(counter.default_constructed == 1);
-            REQUIRE(counter.copy_constructed == 1);
-            REQUIRE(counter.move_constructed <= 1);
-
-            auto c_count = counter.move_constructed;
-
-            // pop move constructs and deletes the element
-            auto check = test_buf.pop();
-            REQUIRE(counter.move_constructed == c_count + 1);
-            REQUIRE(counter.destroyed == 1);
+TEST_SUITE("ftl::ring buffer with static_storage") {
+    TEST_CASE("static requirements (builtin value)") {
+        SUBCASE("ring buffer is nothrow constructible and assignable") {
+            CHECK(std::is_nothrow_constructible<static_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_copy_constructible<static_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_move_constructible<static_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_copy_assignable<static_ring_buffer<int>>::value);
+            CHECK(std::is_nothrow_move_assignable<static_ring_buffer<int>>::value);
         }
-        REQUIRE(counter.destroyed == 2);
-        */
+
+        SUBCASE("triviality") {
+            CHECK(std::is_trivially_copy_constructible<static_ring_buffer<int>>::value);
+            CHECK(std::is_trivially_move_constructible<static_ring_buffer<int>>::value);
+            CHECK(std::is_trivially_copy_assignable<static_ring_buffer<int>>::value);
+            CHECK(std::is_trivially_move_assignable<static_ring_buffer<int>>::value);
+        }
     }
 
-    SUBCASE("overhead") {
+    TEST_CASE("static requirements (trivial value)") {
+        SUBCASE("ring buffer is nothrow constructible and assignable") {
+            CHECK(std::is_nothrow_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_nothrow_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+        }
+
+        SUBCASE("ring buffer is trivially copyable / movable") {
+            CHECK(std::is_trivially_copy_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_trivially_move_constructible<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_trivially_copy_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+            CHECK(std::is_trivially_move_assignable<static_ring_buffer<ftl_test::trivial_type>>::value);
+        }
+    }
+
+    TEST_CASE("static requirements (non-trivial value)") {
+        SUBCASE("ring buffer is copyable / movable") {
+            CHECK(std::is_copy_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_move_constructible<static_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_copy_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
+            CHECK(std::is_move_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
+        }
+    }
+
+    TEST_CASE("memory overhead") {
         ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
         ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
         ftl::ring_buffer<char, ftl::static_storage<8>> test_buf_c8;
@@ -87,10 +59,10 @@ TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
         ftl::ring_buffer<std::string, ftl::static_storage<8>> test_buf_s8;
 
         // Overhead for static ring buf at most two pointers + the size of the storage
-        REQUIRE(sizeof(test_buf_i16) <= sizeof(int) * 16 + sizeof(int*) * 2);
-        REQUIRE(sizeof(test_buf_i32) <= sizeof(int) * 32 + sizeof(int*) * 2);
-        REQUIRE(sizeof(test_buf_c8) <= sizeof(char) * 8 + sizeof(char*) * 2);
-        REQUIRE(sizeof(test_buf_s8) <= sizeof(std::string) * 8 + sizeof(std::string*) * 2);
+        CHECK(sizeof(test_buf_i16) <= sizeof(int) * 16 + sizeof(int*) * 2);
+        CHECK(sizeof(test_buf_i32) <= sizeof(int) * 32 + sizeof(int*) * 2);
+        CHECK(sizeof(test_buf_c8) <= sizeof(char) * 8 + sizeof(char*) * 2);
+        CHECK(sizeof(test_buf_s8) <= sizeof(std::string) * 8 + sizeof(std::string*) * 2);
 
         // Check we remembered to actually include the bookkeeping pointers and init the array to right size
         REQUIRE(sizeof(test_buf_i16) > sizeof(int) * 16);
@@ -99,107 +71,123 @@ TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
         REQUIRE(sizeof(test_buf_s8) > sizeof(std::string) * 8);
     }
 
-    SUBCASE("assignment and copy/move initialisation") {
-        ftl::ring_buffer<int, ftl::static_storage<8>> buf0;
-        ftl::ring_buffer<int, ftl::static_storage<8>> buf1;
-
-        for (int i = 0; i < 8; ++i) {
-            buf0.push(i);
-            buf1.push(7-i);
+    TEST_CASE("capacity, size and emptiness / fullness") {
+        SUBCASE("Default-constructed ring buffer is empty") {
+            ftl::ring_buffer<char, ftl::static_storage<8>> fresh_unmodified_buffer;
+            CHECK(fresh_unmodified_buffer.is_empty());
+            CHECK(not fresh_unmodified_buffer.is_full());
         }
 
-        {
-            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf;
-            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf2;
+        SUBCASE("Default-constructed ring buffer has the capacity requested") {
+            ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
+            ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
+            ftl::ring_buffer<char, ftl::static_storage<8>> test_buf_c8;
+            ftl::ring_buffer<std::string, ftl::static_storage<8>> test_buf_s8;
 
-            tmp_buf = buf1;
-            tmp_buf2 = std::move(buf1);
-
-            for (int i = 0; i < 8; ++i) {
-                REQUIRE(tmp_buf.pop() == tmp_buf2.pop());
-            }
+            CHECK(test_buf_i16.capacity() == 16);
+            CHECK(test_buf_i32.capacity() == 32);
+            CHECK(test_buf_c8.capacity() == 8);
+            CHECK(test_buf_s8.capacity() == 8);
         }
 
-        { // copy init
-            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf = buf0;
-            ftl::ring_buffer<int, ftl::static_storage<8>> comparison_buffer = buf0;
+        SUBCASE("Filling a buffer makes it full and reading frees space") {
+            ftl::ring_buffer<int, ftl::static_storage<4>> test_buf_i4;
+            for (int i = 0; i < static_cast<int>(test_buf_i4.capacity()); ++i)
+                test_buf_i4.push(i);
 
-            for (int i = 0; i < 8; ++i) {
-                REQUIRE(tmp_buf.pop() == comparison_buffer.pop());
-            }
-        }
+            CHECK(test_buf_i4.is_full());
 
-        { // move init
-            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf = buf0;
-            ftl::ring_buffer<int, ftl::static_storage<8>> comparison_buffer = std::move(tmp_buf);
-            tmp_buf = buf0;
+            int i = test_buf_i4.pop();
+            (void)i;
 
-            for (int i = 0; i < 8; ++i) {
-                REQUIRE(tmp_buf.pop() == comparison_buffer.pop());
-            }
+            CHECK(not test_buf_i4.is_full());
         }
     }
 
-    SUBCASE("pushing / popping values (builtin value)") {
-        static_ring_buffer<int> test_ring;
+    TEST_CASE("construction / destruction of contained objects") {
+        SUBCASE("Allocating storage doesn't cause object initialisation") {
+            using counter_type = ftl_test::counted_ctr_dtr<"srb-cdc-0">;
+            ftl::ring_buffer<counter_type, ftl::static_storage<16>> test_buf;
 
-        test_ring.push(1);
-        REQUIRE(test_ring.pop() == 1);
+            REQUIRE(counter_type::default_constructed == 0);
+            REQUIRE(counter_type::copy_constructed == 0);
+            REQUIRE(counter_type::move_constructed == 0);
+            REQUIRE(counter_type::destroyed == 0);
+        }
 
-        test_ring.push(2);
-        test_ring.push(3);
-        REQUIRE(test_ring.pop() == 2);
-        REQUIRE(test_ring.pop() == 3);
+        SUBCASE("push/pop with copy semantics") {
+            ftl_test::counted_ctr_dtr<"srb-pp-copy"> counter;
+            {
+                ftl::ring_buffer<decltype(counter), ftl::static_storage<6>> test_buf;
 
-        test_ring.push(4);
-        test_ring.push(5);
-        REQUIRE(test_ring.pop() == 4);
-        test_ring.push(6);
-        REQUIRE(test_ring.pop() == 5);
-        REQUIRE(test_ring.pop() == 6);
+                REQUIRE(counter.default_constructed == 1);
+                REQUIRE(counter.copy_constructed == 0);
+                REQUIRE(counter.move_constructed == 0);
+                REQUIRE(counter.destroyed == 0);
 
-        // this should be enough to wrap
-        for (int i = 7; i < 18; ++i)
-            test_ring.push(i);
+                // check that pushing doesn't make extra copies (can't make this a
+                // subcase, since it would affect the counter)
+                test_buf.push(counter); // first instance
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 1);
+                CHECK(counter.move_constructed == 0);
+                CHECK(counter.destroyed == 0);
 
-        // read all remaining
-        int i = 7;
-        while(not test_ring.is_empty())
-            REQUIRE(test_ring.pop() == i++);
+                test_buf.push(counter); // second instance
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 2);
+                CHECK(counter.move_constructed == 0);
+                CHECK(counter.destroyed == 0);
 
-        REQUIRE(test_ring.is_empty());
-    }
+                // check popping moves the value and calls the destructor}
+                auto ctr = test_buf.pop(); // moved value = 3rd instance
+                (void)ctr;
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 2);
+                CHECK(counter.move_constructed == 1);
+                CHECK(counter.destroyed == 1);
+            };
 
-    SUBCASE("capacity and emptiness / fullness") {
-        // static buffer capacity comes straight from initialisation
-        ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
-        ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
-        ftl::ring_buffer<char, ftl::static_storage<8>> test_buf_c8;
+            // destructors called correctly for all 3 existing instances
+            CHECK(counter.destroyed == 3);
+        }
 
-        ftl::ring_buffer<std::string, ftl::static_storage<8>> test_buf_s8;
+        SUBCASE("push/pop with move semantics") {
+            ftl_test::counted_ctr_dtr<"srb-pp-move"> counter;
+            {
+                ftl::ring_buffer<decltype(counter), ftl::static_storage<6>> test_buf;
 
-        REQUIRE(test_buf_i16.capacity() == 16);
-        REQUIRE(test_buf_i32.capacity() == 32);
-        REQUIRE(test_buf_c8.capacity() == 8);
-        REQUIRE(test_buf_s8.capacity() == 8);
+                REQUIRE(counter.default_constructed == 1);
+                REQUIRE(counter.copy_constructed == 0);
+                REQUIRE(counter.move_constructed == 0);
+                REQUIRE(counter.destroyed == 0);
 
-        // static ring buffer is empty (and thus cannot be full) before modification
-        ftl::ring_buffer<char, ftl::static_storage<8>> fresh_unmodified_buffer;
-        REQUIRE(fresh_unmodified_buffer.is_empty());
-        REQUIRE(not fresh_unmodified_buffer.is_full());
+                // check that pushing doesn't make extra copies (can't make this a
+                // subcase, since it would affect the counter)
+                test_buf.push(FTL_MOVE(counter)); // first instance
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 0);
+                CHECK(counter.move_constructed == 1);
+                CHECK(counter.destroyed == 0);
 
-        for (int i = 0; i < static_cast<int>(test_buf_i16.capacity()); ++i)
-            test_buf_i16.push(i);
+                test_buf.push(FTL_MOVE(counter)); // second instance
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 0);
+                CHECK(counter.move_constructed == 2);
+                CHECK(counter.destroyed == 0);
 
-        REQUIRE(test_buf_i16.is_full());
+                // check popping moves the value and calls the destructor}
+                auto ctr = test_buf.pop(); // moved value = 3rd instance
+                (void)ctr;
+                CHECK(counter.default_constructed == 1);
+                CHECK(counter.copy_constructed == 0);
+                CHECK(counter.move_constructed == 3);
+                CHECK(counter.destroyed == 1);
+            };
 
-        int i = test_buf_i16.pop();
-        (void)i;
-
-        REQUIRE(not test_buf_i16.is_full());
-    }
-
-    SUBCASE("swap") {
+            // destructors called correctly for all 3 existing instances
+            CHECK(counter.destroyed == 3);
+        }
     }
 }
 
