@@ -42,6 +42,43 @@ TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
         REQUIRE(std::is_move_assignable<static_ring_buffer<ftl_test::nontrivial_type>>::value);
     }
 
+    SUBCASE("properly destroying contained objects") {
+        // causes default_constructed to increase to 1
+        ftl_test::counted_ctr_dtr<"static ftl::ring_buffer tests"> counter;
+
+        ftl::ring_buffer<decltype(counter), ftl::static_storage<16>> test_buf;
+
+        // elements in static ring buffer are not default_constructed
+        REQUIRE(counter.default_constructed == 1);
+
+        /*
+        // Verify initial state
+        REQUIRE(counter.copy_constructed == 0);
+        REQUIRE(counter.move_constructed == 0);
+        REQUIRE(counter.destroyed == 0);
+
+        {
+            test_buf.push(counter);
+            REQUIRE(counter.default_constructed == 1);
+            REQUIRE(counter.copy_constructed == 1);
+            REQUIRE(counter.move_constructed == 0);
+
+            test_buf.push(static_cast<decltype(counter)&&>(counter));
+            REQUIRE(counter.default_constructed == 1);
+            REQUIRE(counter.copy_constructed == 1);
+            REQUIRE(counter.move_constructed <= 1);
+
+            auto c_count = counter.move_constructed;
+
+            // pop move constructs and deletes the element
+            auto check = test_buf.pop();
+            REQUIRE(counter.move_constructed == c_count + 1);
+            REQUIRE(counter.destroyed == 1);
+        }
+        REQUIRE(counter.destroyed == 2);
+        */
+    }
+
     SUBCASE("overhead") {
         ftl::ring_buffer<int, ftl::static_storage<16>> test_buf_i16;
         ftl::ring_buffer<int, ftl::static_storage<32>> test_buf_i32;
@@ -54,15 +91,52 @@ TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
         REQUIRE(sizeof(test_buf_i32) <= sizeof(int) * 32 + sizeof(int*) * 2);
         REQUIRE(sizeof(test_buf_c8) <= sizeof(char) * 8 + sizeof(char*) * 2);
         REQUIRE(sizeof(test_buf_s8) <= sizeof(std::string) * 8 + sizeof(std::string*) * 2);
+
+        // Check we remembered to actually include the bookkeeping pointers and init the array to right size
+        REQUIRE(sizeof(test_buf_i16) > sizeof(int) * 16);
+        REQUIRE(sizeof(test_buf_i32) > sizeof(int) * 32);
+        REQUIRE(sizeof(test_buf_c8) > sizeof(char) * 8);
+        REQUIRE(sizeof(test_buf_s8) > sizeof(std::string) * 8);
     }
 
-    SUBCASE("assignment") {
+    SUBCASE("assignment and copy/move initialisation") {
         ftl::ring_buffer<int, ftl::static_storage<8>> buf0;
         ftl::ring_buffer<int, ftl::static_storage<8>> buf1;
 
         for (int i = 0; i < 8; ++i) {
             buf0.push(i);
             buf1.push(7-i);
+        }
+
+        {
+            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf;
+            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf2;
+
+            tmp_buf = buf1;
+            tmp_buf2 = std::move(buf1);
+
+            for (int i = 0; i < 8; ++i) {
+                REQUIRE(tmp_buf.pop() == tmp_buf2.pop());
+            }
+        }
+
+        { // copy init
+            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf = buf0;
+            ftl::ring_buffer<int, ftl::static_storage<8>> comparison_buffer = buf0;
+
+            for (int i = 0; i < 8; ++i) {
+                REQUIRE(tmp_buf.pop() == comparison_buffer.pop());
+            }
+        }
+
+        { // move init
+            ftl::ring_buffer<int, ftl::static_storage<8>> tmp_buf = buf0;
+            ftl::ring_buffer<int, ftl::static_storage<8>> comparison_buffer = std::move(tmp_buf);
+            tmp_buf = buf0;
+
+            for (int i = 0; i < 8; ++i) {
+                REQUIRE(tmp_buf.pop() == comparison_buffer.pop());
+            }
         }
     }
 
@@ -110,8 +184,9 @@ TEST_CASE("ftl::ring buffer with static_storage - basic traits") {
         REQUIRE(test_buf_s8.capacity() == 8);
 
         // static ring buffer is empty (and thus cannot be full) before modification
-        REQUIRE(test_buf_i16.is_empty());
-        REQUIRE(not test_buf_i16.is_full());
+        ftl::ring_buffer<char, ftl::static_storage<8>> fresh_unmodified_buffer;
+        REQUIRE(fresh_unmodified_buffer.is_empty());
+        REQUIRE(not fresh_unmodified_buffer.is_full());
 
         for (int i = 0; i < static_cast<int>(test_buf_i16.capacity()); ++i)
             test_buf_i16.push(i);

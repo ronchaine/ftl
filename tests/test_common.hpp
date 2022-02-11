@@ -1,6 +1,8 @@
 #ifndef FTL_TEST_COMMON_HPP
 #define FTL_TEST_COMMON_HPP
 
+#include <cstdint>
+
 namespace ftl_test
 {
     struct trivial_type {
@@ -28,6 +30,33 @@ namespace ftl_test
         nontrivial_type& operator=(const nontrivial_type&) { return *this; };
         nontrivial_type& operator=(nontrivial_type&&) { return *this; }
         ~nontrivial_type() {};
+    };
+
+    template<std::size_t N>
+    struct ct_string_wrap
+    {
+        consteval ct_string_wrap(const char (&str)[N]) {
+            for (std::size_t idx = 0; idx < N; ++idx)
+                strptr[idx] = str[idx];
+        }
+
+        char strptr[N];
+    };
+
+    template <ct_string_wrap id>
+    struct counted_ctr_dtr {
+        counted_ctr_dtr() { default_constructed++; }
+        counted_ctr_dtr(const counted_ctr_dtr&) { copy_constructed++; }
+        counted_ctr_dtr(counted_ctr_dtr&&) { move_constructed++; }
+        ~counted_ctr_dtr() { destroyed++; }
+
+        counted_ctr_dtr& operator=(const counted_ctr_dtr& c) = default;
+        counted_ctr_dtr& operator=(counted_ctr_dtr&& c) = default;
+
+        inline static std::size_t default_constructed;
+        inline static std::size_t copy_constructed;
+        inline static std::size_t move_constructed;
+        inline static std::size_t destroyed;
     };
 }
 

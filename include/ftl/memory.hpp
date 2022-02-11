@@ -1,17 +1,32 @@
-#ifndef FTL_UTILITY_HPP
-#define FTL_UTILITY_HPP
+#ifndef FTL_MEMORY_HPP
+#define FTL_MEMORY_HPP
+
+#include <cstdint>
+#include <type_traits>
+#include <concepts>
+
+#if __STDC_HOSTED__ == 1
+# define FTL_DEFAULT_ALLOCATOR std::allocator<T>
+#else
+# define FTL_DEFAULT_ALLOCATOR ftl::static_storage<64>
+#endif
 
 namespace ftl
 {
-    template <typename... T> [[maybe_unused]]
-    constexpr static bool always_false = false;
-};
+    template <typename T>
+    concept Any_good_enough_allocator = requires(T t) {
+        { T::pointer };
+        { T::allocate() } -> std::same_as<typename T::pointer>;
+        { T::deallocate() };
+    };
 
-#define FTL_MOVE(...) \
-    static_cast<std::remove_reference_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)
-
-#define FTL_FORWARD(...) \
-    static_cast<decltype(__VA_ARGS__)&&>(__VA_ARGS__)
+    template <std::size_t StorageBytes>
+    struct static_storage
+    {
+        static_assert(StorageBytes != 0);
+        constexpr static std::size_t size = StorageBytes;
+    };
+}
 
 #endif
 /*

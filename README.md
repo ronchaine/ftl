@@ -45,7 +45,7 @@ allocators or use heap memory.
 
 Ring buffer
 -----------
-Defined in `ring_buffer.hpp`, doesn't use other headers
+Defined in `ring_buffer.hpp`, uses `utility_macros.hpp` and `memory.hpp`
 
 Very simple ring buffer with `push` and `pop`.  Resizes itself
 if allocator is given when unread elements fill the entire

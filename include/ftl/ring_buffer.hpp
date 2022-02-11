@@ -2,212 +2,293 @@
 #define FTL_RINGBUFFER_HPP
 
 #include <type_traits>
+#include <new>
+
+#include "memory.hpp"
+#include "utility_macros.hpp"
+
+#define PRINT_DEBUG
 
 #if __STDC_HOSTED__ == 1
 # include <stdexcept>
 # include <memory>
 # include <cassert>
-# define FTL_DEFAULT_ALLOCATOR std::allocator<T>
 #else
 // TODO:  we probably want our own assert since this is not in
 // standard either, both gcc and clang provide it in freestanding
 // though
 # include <assert.h>
-# define FTL_DEFAULT_ALLOCATOR ftl::static_storage<128>
 #endif
 
 namespace ftl
 {
-    template <size_t StorageBytes>
-    struct static_storage
-    {
-        static_assert(StorageBytes != 0);
-        constexpr static size_t size = StorageBytes;
-    };
+    namespace detail {
+        // These are just so that the following specialisations are more readable
+        constexpr static bool REFERENCE = true;
+        constexpr static bool NOT_REFERENCE = false;
 
-    template <typename T, typename Allocator>
-    class ring_buffer_details
-    {
-        public:
+        constexpr static bool TRIVIALLY_DESTRUCTIBLE = true;
+        constexpr static bool NOT_TRIVIALLY_DESTRUCTIBLE = false;
+
+        template <typename T,
+                  typename Unknown,
+                  bool IsReference = std::is_reference<T>::value,
+                  bool IsTriviallyDestructible = std::is_trivially_destructible<T>::value>
+        struct ring_buffer_storage
+        {
+            static_assert(always_false<T>, "Invalid argument for ring buffer's storage");
+        };
+
+        template <typename T, Any_good_enough_allocator Allocator, bool Ref, bool CallDestructor>
+        struct ring_buffer_storage<T, Allocator, Ref, CallDestructor>
+        {
             constexpr static bool   is_dynamic = true;
 
-            using size_type         = std::size_t;
+            using value_type        = T;
             using allocator_type    = Allocator;
-            using pointer           = typename std::allocator_traits<Allocator>::pointer;
-            using const_pointer     = typename std::allocator_traits<Allocator>::const_pointer;
+            using pointer           = typename Allocator::pointer;
 
             [[nodiscard]] constexpr allocator_type get_allocator() noexcept { return allocator; }
 
-            ~ring_buffer_details() {
-                if constexpr(is_dynamic)
-                    allocator.deallocate(data_ptr, data_size);
-            }
+            allocator_type allocator;
+        };
 
-        protected:
-            constexpr static size_t initial_power   = 2;
-            constexpr static size_t initial_size    = 2 << initial_power;
-            constexpr static size_t grow_factor     = 2;
+        template <typename T, size_t StaticSize, bool Dummy>
+        struct ring_buffer_storage<T, ftl::static_storage<StaticSize>, REFERENCE, Dummy>
+        {
+            constexpr static bool       is_dynamic = false;
 
-            inline void grow(T*& read_head, T*& write_head) {
-                T* old_data_ptr = data_ptr;
-                const size_t new_size = data_size == 0 ? initial_size : data_size * grow_factor;
+            constexpr static size_t     data_size = StaticSize;
+        };
 
-                T* new_data_ptr = this->allocator.allocate(new_size);
+        template <typename T, size_t StaticSize>
+        struct ring_buffer_storage<T, ftl::static_storage<StaticSize>, NOT_REFERENCE, TRIVIALLY_DESTRUCTIBLE>
+        {
+            public:
+                using value_type                        = T;
+                using allocator_type                    = void;
+                using pointer                           = T*;
+                using const_pointer                     = const T* const;
+                using size_type                         = std::size_t;
 
-                size_t it = 0;
-                while (read_head != write_head) {
-                    new_data_ptr[it++] = static_cast<T&&>(*read_head);
-                    read_head = read_head == data_size - 1 ? 0 : read_head + 1;
+                constexpr static bool is_dynamic        = false;
+                constexpr static size_t data_size       = StaticSize;
+
+                constexpr ring_buffer_storage() noexcept = default;
+                constexpr ~ring_buffer_storage() noexcept = default;
+
+                constexpr inline bool is_empty() const noexcept { return (write_head == read_head) || read_head == nullptr; }
+                constexpr inline bool is_full() const noexcept { return write_head == nullptr; }
+
+                constexpr inline void advance_write_head() noexcept {
+                    write_head = write_head == data() + data_size - 1 ? data() : write_head + 1;
+                    if (write_head == read_head)
+                        write_head = nullptr;
                 }
 
-                read_head = new_data_ptr;
-                write_head = new_data_ptr + it;
+                constexpr inline void advance_read_head() noexcept {
+                    read_head = read_head == data() + data_size - 1 ? data() : read_head + 1;
+                }
 
-                allocator.deallocate(old_data_ptr, data_size);
-                data_ptr = new_data_ptr;
-                data_size = new_size;
+                constexpr inline void release() const noexcept { return; }
+
+                constexpr pointer data() noexcept { return std::launder(reinterpret_cast<pointer>(&store)); }
+                constexpr size_type get_capacity() const noexcept { return StaticSize; }
+
+            protected:
+                constexpr inline pointer& get_write_head() noexcept { return write_head; }
+                constexpr inline pointer& get_read_head() noexcept { return read_head; }
+
+                constexpr inline const_pointer& get_write_head() const noexcept { return write_head; }
+                constexpr inline const_pointer& get_read_head() const noexcept { return read_head; }
+
+            private:
+                std::aligned_storage_t<sizeof(T), alignof(T)> store[StaticSize];
+
+                pointer write_head = data();
+                pointer read_head = nullptr;
+        };
+
+        template <typename T, size_t StaticSize>
+        struct ring_buffer_storage<T, ftl::static_storage<StaticSize>, NOT_REFERENCE, NOT_TRIVIALLY_DESTRUCTIBLE>
+        {
+            public:
+                using value_type                        = T;
+                using allocator_type                    = void;
+                using pointer                           = T*;
+                using const_pointer                     = const T* const;
+                using size_type                         = std::size_t;
+
+                constexpr static bool is_dynamic        = false;
+                constexpr static size_t data_size       = StaticSize;
+
+                constexpr ring_buffer_storage() noexcept = default;
+
+                constexpr inline void advance_write_head() noexcept {
+                    write_head = write_head == data() + data_size - 1 ? data() : write_head + 1;
+                    if (write_head == read_head)
+                        write_head = nullptr;
+                }
+
+                constexpr inline void advance_read_head() noexcept {
+                    read_head = read_head == data() + data_size - 1 ? data() : read_head + 1;
+                }
+
+                ~ring_buffer_storage() {
+                    if (read_head == nullptr) {
+                        return;
+                    }
+
+                    if (write_head == nullptr) {
+                        // TODO: handle read_head == nullptr
+                        write_head = read_head == data() + data_size - 1 ? data() : read_head + 1;
+                    }
+
+                    while(write_head != read_head) {
+                        get_read_head()->~T();
+                        advance_read_head();
+                    }
+                }
+
+                constexpr void release() noexcept {
+                    get_read_head()->~T();
+                }
+
+                constexpr pointer data() noexcept { return std::launder(reinterpret_cast<pointer>(&store)); }
+                constexpr size_type get_capacity() const noexcept { return StaticSize; }
+
+            protected:
+                constexpr inline pointer& get_write_head() noexcept { return write_head; }
+                constexpr inline pointer& get_read_head() noexcept { return read_head; }
+
+                constexpr inline const_pointer& get_write_head() const noexcept { return write_head; }
+                constexpr inline const_pointer& get_read_head() const noexcept { return read_head; }
+
+            private:
+                std::aligned_storage_t<sizeof(T), alignof(T)> store[StaticSize];
+
+                pointer write_head = data();
+                pointer read_head = nullptr;
+        };
+
+        template <typename T, typename Storage>
+        struct ring_buffer_details : ring_buffer_storage<T, Storage>
+        {
+            using value_type = typename ring_buffer_storage<T, Storage>::value_type;
+
+            using ring_buffer_storage<T, Storage>::get_write_head;
+            using ring_buffer_storage<T, Storage>::get_read_head;
+            using ring_buffer_storage<T, Storage>::advance_write_head;
+            using ring_buffer_storage<T, Storage>::advance_read_head;
+            using ring_buffer_storage<T, Storage>::release;
+            using ring_buffer_storage<T, Storage>::data;
+
+            constexpr bool is_empty() const noexcept { return (get_write_head() == get_read_head()) || get_read_head() == nullptr; }
+            constexpr bool is_full() const noexcept { return get_write_head() == nullptr; }
+
+            constexpr void construct(value_type&& elem) {
+                PRINT_DEBUG("at start of construct");
+                if (get_read_head() == nullptr) [[unlikely]]
+                    get_read_head() = data();
+
+                if (is_full()) {
+                    #ifdef __cpp_exceptions
+                        throw std::out_of_range("ring buffer full");
+                    #endif
+                    assert(not is_full()); 
+
+                    // just overwrite if NDEBUG and no exceptions
+                    release();
+                    get_write_head() = get_read_head();
+                    advance_read_head();
+                }
+                PRINT_DEBUG("before placement new");
+                // TODO: figure out if this move could be elided
+                ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_FORWARD(elem) };
+                advance_write_head();
+                PRINT_DEBUG("at end of construct");
             }
 
-            allocator_type          allocator;
+            constexpr void construct_overwrite(value_type&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) {
+                if (get_read_head() == nullptr) [[unlikely]]
+                    get_read_head() = data();
 
-            T*                      data_ptr        = nullptr;
-            size_type               data_size       = 0;
-    };
+                if (is_full()) {
+                    release();
+                    get_write_head() = get_read_head();
+                    advance_read_head();
+                }
 
-    template <typename T, size_t StaticSize>
-    class ring_buffer_details<T, static_storage<StaticSize>>
-    {
-        public:
-            constexpr static bool   is_dynamic = false;
-            constexpr static size_t data_size = StaticSize;
+                // TODO: figure out if this move could be elided
+                ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_MOVE(elem) };
+                advance_write_head();
+            }
 
-            constexpr ring_buffer_details() noexcept = default;
+            constexpr T&& read_delete() {
+                #ifdef __cpp_exceptions
+                    if (is_empty()) throw std::out_of_range("read from empty ring buffer");
+                #endif
+                assert(not is_empty());
 
-        protected:
-            T                       data_ptr[StaticSize] {};
-    };
+                T&& val = FTL_MOVE(*(get_read_head()));
+                if (get_write_head() == nullptr)
+                    get_write_head() = get_read_head();
 
-    template <typename T, typename Allocator = FTL_DEFAULT_ALLOCATOR>
-    class ring_buffer : public ring_buffer_details<T, Allocator>
+                advance_read_head();
+                return FTL_MOVE(val);
+            }
+        };
+    }
+
+    template <typename T, typename Storage = FTL_DEFAULT_ALLOCATOR>
+    class ring_buffer : detail::ring_buffer_details<T, Storage>
     {
         public:
             using value_type        = T;
             using size_type         = std::size_t;
-            using difference_type   = std::ptrdiff_t;
-            using reference         = T&;
-            using const_reference   = const T&;
-
-            using ring_buffer_details<T, Allocator>::is_dynamic;
 
             template <bool is_const>
             class rb_iterator;
-
-            using iterator          = rb_iterator<false>;
-            using const_iterator    = rb_iterator<true>;
+            using iterator = rb_iterator<false>;
+            using const_iterator = rb_iterator<true>;
 
             constexpr ring_buffer() = default;
 
+            // iterators
+            constexpr iterator begin();
+            constexpr const_iterator begin() const;
+
+            constexpr iterator end();
+            constexpr const_iterator end() const;
+
             // modifiers
-            constexpr void push(const T& elem);
-            constexpr void push(T&& elem);
+            constexpr void push(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(T{elem}); }
+            constexpr void push(T&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->construct(FTL_MOVE(elem)); }
 
-            constexpr void push_overwrite(const T& elem);
-            constexpr void push_overwrite(T&& elem);
+            /*
+            template <typename... Args> requires all_of_type<Args, T>
+            constexpr void push(Args&&...); // insert multiple
 
-            constexpr void swap(ring_buffer& rhs) noexcept { swap(*this, rhs); }
+            template <typename... Args>
+            constexpr void push(Args&&...); // in-place construction
+            */
 
-            [[nodiscard]] constexpr T&& pop();
+            constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct_overwrite(elem); }
+            constexpr void push_overwrite(T&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->construct_overwrite(FTL_MOVE(elem)); }
+
+            /*
+            template <typename... Args>
+            constexpr void push_overwrite(Args&&...); // in-place construction
+            */
+
+            constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
+
+            [[nodiscard]] constexpr T&& pop() { return this->read_delete(); } ;
 
             // queries
-            [[nodiscard]] constexpr size_type capacity() const noexcept { return data_size; }
-            [[nodiscard]] constexpr bool is_empty() const noexcept { return write_head == read_head; }
-            [[nodiscard]] constexpr bool is_full() const noexcept { return buffer_out_of_space(); }
-
-        private:
-            using ring_buffer_details<T, Allocator>::data_size;
-            using ring_buffer_details<T, Allocator>::data_ptr;
-
-            inline bool buffer_out_of_space() const noexcept;
-
-            T* read_head    = data_ptr;
-            T* write_head   = data_ptr;
-    };
-
-    template <typename T, typename A>
-    bool ring_buffer<T,A>::buffer_out_of_space() const noexcept {
-        if (data_size == 0)
-            return true;
-
-        if (write_head == nullptr)
-            return true;
-
-        return false;
-    }
-
-    template <typename T, typename A>
-    constexpr void ring_buffer<T,A>::push(const T& elem) {
-        T movable = elem;
-        push(static_cast<T&&>(movable));
-    }
-
-    template <typename T, typename A>
-    constexpr void ring_buffer<T,A>::push(T&& elem) {
-        if (buffer_out_of_space()) {
-            if constexpr(is_dynamic) {
-                this->grow(read_head, write_head);
-            } else {
-                // We just overwrite on overflow
-            }
-        }
-
-        *write_head = elem;
-        write_head = write_head == data_ptr + data_size - 1 ? data_ptr : write_head + 1;
-        if (write_head == read_head)
-            write_head = nullptr;
-    }
-
-    template <typename T, typename A>
-    [[nodiscard]] constexpr T&& ring_buffer<T,A>::pop() {
-        #ifdef __cpp_exceptions
-            if (is_empty()) throw std::out_of_range{"read from empty ring buffer"};
-        #endif
-        assert(not is_empty());
-        T&& val = static_cast<T&&>(*read_head);
-
-        if (write_head == nullptr)
-            write_head = read_head;
-
-        read_head = read_head == data_ptr + data_size - 1 ? data_ptr : read_head + 1;
-        return static_cast<T&&>(val);
-    }
-
-    template <typename T, typename A>
-    constexpr void swap(ring_buffer<T,A>& a, ring_buffer<T,A>& b) noexcept {
-        auto tmp(a);
-        a = b;
-        b = tmp;
-    }
-
-    template <typename T, typename A> template <bool is_const>
-    class ring_buffer<T,A>::rb_iterator
-    {
-        public:
-            // TODO: Make sure we have something for std::forward_iterator_tag if
-            //       on freestanding (works with gcc and clang currently)
-
-            // The iterator is LegacyBidirectionalIterator, but not bidirectional_iterator
-            // for the C++ standard
-            using iterator_category = std::bidirectional_iterator_tag;
-            using value_type = T;
-            using difference_type = std::ptrdiff_t;
-            using pointer = T*;
-            using reference = T&;
-
-            // LegacyIterator requirements
-            constexpr reference operator*() { return *ptr; };
-
-        private:
-            T* ptr;
+            [[nodiscard]] constexpr size_type capacity() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_capacity(); }
+            [[nodiscard]] constexpr bool is_empty() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_empty(); }
+            [[nodiscard]] constexpr bool is_full() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_full(); }
     };
 }
 
