@@ -9,17 +9,6 @@
 
 namespace ftl
 {
-    template <typename T, typename FD, typename... Dims>
-    constexpr static bool each_convertible_to(FD, Dims... d) noexcept
-    {
-        if constexpr (not std::is_convertible_v<FD, T>)
-            return false;
-        if constexpr (sizeof...(Dims))
-            return each_convertible_to<T>(d...);
-
-        return true;
-    }
-
     template <typename T, std::size_t... Dimensions>
     class array
     {

@@ -1,10 +1,23 @@
 #ifndef FTL_UTILITY_HPP
 #define FTL_UTILITY_HPP
 
+#include <type_traits>
+
 namespace ftl
 {
     template <typename... T> [[maybe_unused]]
     constexpr static bool always_false = false;
+
+    template <typename T, typename FD, typename... Dims>
+    constexpr static bool each_convertible_to(FD, Dims... d) noexcept
+    {
+        if constexpr (not std::is_convertible_v<FD, T>)
+            return false;
+        if constexpr (sizeof...(Dims))
+            return each_convertible_to<T>(d...);
+
+        return true;
+    }
 };
 
 #define FTL_MOVE(...) \

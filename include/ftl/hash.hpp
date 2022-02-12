@@ -1,6 +1,7 @@
 #ifndef FTL_HASH_HPP
 #define FTL_HASH_HPP
 
+#include <cstdint>
 #include <type_traits>
 
 namespace ftl
