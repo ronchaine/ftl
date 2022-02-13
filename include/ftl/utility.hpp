@@ -5,13 +5,16 @@
 
 namespace ftl
 {
+    struct no_init_tag_t {};
+    [[maybe_unused]] constexpr static no_init_tag_t do_not_init;
+
     template <typename... T> [[maybe_unused]]
     constexpr static bool always_false = false;
 
-    template <typename T, typename FD, typename... Dims>
-    constexpr static bool each_convertible_to(FD, Dims... d) noexcept
+    template <typename T, typename First, typename... Dims>
+    constexpr static bool each_convertible_to(First, Dims... d) noexcept
     {
-        if constexpr (not std::is_convertible_v<FD, T>)
+        if constexpr (not std::is_convertible_v<First, T>)
             return false;
         if constexpr (sizeof...(Dims))
             return each_convertible_to<T>(d...);
@@ -19,6 +22,18 @@ namespace ftl
         return true;
     }
 };
+
+namespace ftl::detail
+{
+    // These are just so that the template specialisations for common
+    // template parameters are more readable
+    [[maybe_unused]] constexpr static bool REFERENCE = true;
+    [[maybe_unused]] constexpr static bool NOT_REFERENCE = false;
+
+    [[maybe_unused]] constexpr static bool TRIVIALLY_DESTRUCTIBLE = true;
+    [[maybe_unused]] constexpr static bool NOT_TRIVIALLY_DESTRUCTIBLE = false;
+
+}
 
 #define FTL_MOVE(...) \
     static_cast<std::remove_reference_t<decltype(__VA_ARGS__)>&&>(__VA_ARGS__)

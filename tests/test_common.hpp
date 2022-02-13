@@ -32,6 +32,26 @@ namespace ftl_test
         ~nontrivial_type() {};
     };
 
+    struct move_only_type {
+        move_only_type() = default;
+        move_only_type(move_only_type&&) = default;
+        move_only_type& operator=(move_only_type&&) = default;
+        ~move_only_type() = default;
+
+        move_only_type(const move_only_type&) = delete;
+        move_only_type& operator=(const move_only_type&) = delete;
+    };
+
+    struct copy_only_type {
+        copy_only_type() = default;
+        ~copy_only_type() = default;
+        copy_only_type(const copy_only_type&) = default;
+        copy_only_type& operator=(const copy_only_type&) = default;
+
+        copy_only_type(copy_only_type&&) = delete;
+        copy_only_type& operator=(copy_only_type&&) = delete;
+    };
+
     template<std::size_t N>
     struct ct_string_wrap
     {

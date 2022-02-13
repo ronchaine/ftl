@@ -21,13 +21,6 @@
 namespace ftl
 {
     namespace detail {
-        // These are just so that the following specialisations are more readable
-        // constexpr static bool REFERENCE = true;
-        constexpr static bool NOT_REFERENCE = false;
-
-        constexpr static bool TRIVIALLY_DESTRUCTIBLE = true;
-        constexpr static bool NOT_TRIVIALLY_DESTRUCTIBLE = false;
-
         // for providing decent-ish error message if allocator wasn't good enough
         template <ftl::any_good_enough_allocator T>
         constexpr void test_allocator_suitability() {}
@@ -129,7 +122,10 @@ namespace ftl
                     size_t it = 0;
                     if (old_data_begin != nullptr) {
                         while (read_head != write_head) {
-                            new_data_ptr[it++] = static_cast<T&&>(*read_head);
+                            if constexpr(std::is_move_assignable_v<T>)
+                                new_data_ptr[it++] = static_cast<T&&>(*read_head);
+                            else 
+                                new_data_ptr[it++] = *read_head;
                             advance_read_head();
                         }
                     }
@@ -344,6 +340,23 @@ namespace ftl
                 return FTL_MOVE(val);
             }
 
+            constexpr T read_copy_delete() {
+                #ifdef __cpp_exceptions
+                    if (is_empty()) throw std::out_of_range("read from empty ring buffer");
+                #endif
+                assert(not is_empty());
+
+                // Does this need launder?
+                T val = *get_read_head();
+                if (get_write_head() == nullptr)
+                    get_write_head() = get_read_head();
+
+                release();
+
+                advance_read_head();
+                return T{val};
+            }
+
             constexpr bool is_contiguous() const noexcept {
                 if (get_read_head() == nullptr)
                     return true;
@@ -381,14 +394,18 @@ namespace ftl
 
             // modifiers
             template <typename U> requires std::is_convertible_v<U, T>
-            constexpr void push(U&& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(FTL_FORWARD(elem)); }
+            constexpr void push(U&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->construct(FTL_FORWARD(elem)); }
+
+            template <typename U>
+            constexpr void push(const U& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(elem); }
 
             template <typename U> requires std::is_convertible_v<U, T>
             constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
 
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
-            [[nodiscard]] constexpr T&& pop() { return this->read_delete(); }
+            [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
+            [[nodiscard]] constexpr T pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
 
             // queries
             [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }
