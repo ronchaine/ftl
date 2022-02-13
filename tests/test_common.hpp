@@ -64,6 +64,30 @@ namespace ftl_test
     };
 
     template <ct_string_wrap id, typename T = void>
+    struct copy_only_counter {
+        inline static int count = 0;
+        copy_only_counter() = default;
+        ~copy_only_counter() = default;
+        copy_only_counter(const copy_only_counter&) { count++; }
+        copy_only_counter& operator=(const copy_only_counter&) = default;
+
+        copy_only_counter(copy_only_counter&&) = delete;
+        copy_only_counter& operator=(copy_only_counter&&) = delete;
+    };
+
+    template <ct_string_wrap id, typename T = void>
+    struct move_only_counter {
+        inline static int count = 0;
+        move_only_counter() = default;
+        ~move_only_counter() = default;
+        move_only_counter(const move_only_counter&) = delete;
+        move_only_counter& operator=(const move_only_counter&) = delete;
+
+        move_only_counter(move_only_counter&&) { count++; };
+        move_only_counter& operator=(move_only_counter&&) = default;
+    };
+
+    template <ct_string_wrap id, typename T = void>
     struct counted_ctr_dtr {
         counted_ctr_dtr() { default_constructed++; }
         counted_ctr_dtr(const counted_ctr_dtr&) { copy_constructed++; }

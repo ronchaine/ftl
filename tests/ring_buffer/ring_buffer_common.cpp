@@ -72,20 +72,6 @@ TEST_SUITE("ring buffer common functionality") {
         }
     }
 
-    TEST_CASE_TEMPLATE("Pushing / popping move-only types", T, static_ring_buffer<ftl_test::move_only_type>, std_alloc_ring_buffer<ftl_test::move_only_type>) {
-        T test_buf;
-
-        test_buf.push(ftl_test::move_only_type{});
-        auto t = test_buf.pop(); (void)t;
-    }
-
-    TEST_CASE_TEMPLATE("Pushing / popping copy-only types", T, static_ring_buffer<ftl_test::copy_only_type>, std_alloc_ring_buffer<ftl_test::copy_only_type>) {
-        T test_buf;
-
-        test_buf.push(ftl_test::copy_only_type{});
-        auto t = test_buf.pop(); (void)t;
-    }
-
     TEST_CASE_TEMPLATE("capacity, size and emptiness / fullness", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
         SUBCASE("Default-constructed ring buffer is empty") {
             T fresh_unmodified_buffer;

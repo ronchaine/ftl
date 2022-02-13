@@ -175,6 +175,26 @@ TEST_SUITE("ftl::ring buffer with allocator") {
             CHECK(counter.destroyed == 3);
         }
     }
+
+    TEST_CASE("Pushing / popping move-only types") {
+        using move_counter = ftl_test::move_only_counter<"arb-move-counter-0">;
+        std_alloc_ring_buffer<move_counter> test_buf;
+
+        test_buf.push(move_counter{});
+        CHECK(move_counter::count == 1);
+        auto t = test_buf.pop(); (void)t;
+        CHECK(move_counter::count == 2);
+    }
+
+    TEST_CASE("Pushing / popping copy-only types") {
+        using copy_counter = ftl_test::copy_only_counter<"arb-copy-counter-0">;
+        std_alloc_ring_buffer<copy_counter> test_buf;
+
+        test_buf.push(copy_counter{});
+        CHECK(copy_counter::count == 1);
+        auto t = test_buf.pop(); (void)t;
+        CHECK(copy_counter::count == 2);
+    }
 }
 /*
     Copyright 2022 Jari Ronkainen
