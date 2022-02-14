@@ -26,3 +26,5 @@ ringbuffer_tests = executable(
   dependencies: [ftl_dep]
 )
 
+test('array', array_tests)
+test('ring buffer', ringbuffer_tests)

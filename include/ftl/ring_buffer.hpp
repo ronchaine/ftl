@@ -388,11 +388,11 @@ namespace ftl
             constexpr ring_buffer() = default;
 
             // iterators
-            constexpr iterator begin() { return iterator{*this, this->get_read_head()}; }
-            constexpr const_iterator begin() const;
+            constexpr iterator begin() noexcept { return iterator{*this}; }
+            constexpr const_iterator begin() const noexcept { return const_iterator{*this}; }
 
-            constexpr iterator end();
-            constexpr const_iterator end() const;
+            constexpr iterator end() noexcept { return iterator{*this, nullptr}; }
+            constexpr const_iterator end() const noexcept { return const_iterator{*this, nullptr}; }
 
             // modifiers
             template <typename U> requires std::is_convertible_v<U, T>
@@ -425,6 +425,7 @@ namespace ftl
     class ring_buffer<T, Storage>::rb_iterator
     {
         using target_reference = typename std::conditional<Is_Const, const ring_buffer<T, Storage>&, ring_buffer<T, Storage>&>::type;
+        using target_pointer = typename std::conditional<Is_Const, const ring_buffer<T, Storage>*, ring_buffer<T, Storage>*>::type;
 
         public:
             using value_type        = ring_buffer<T, Storage>::value_type;
@@ -433,18 +434,51 @@ namespace ftl
 
             using reference         = typename std::conditional<Is_Const, const value_type&, value_type&>::type;
 
-            rb_iterator(target_reference ref, pointer beg) : ref{ref}, ptr{beg} {}
+            constexpr rb_iterator(target_reference ref) : ref{&ref} {}
+            constexpr rb_iterator(target_reference ref, pointer ptr) : ref{&ref}, ptr{ptr} {}
 
-            rb_iterator&    operator++() { advance_ptr(); }
-            reference       operator*() { return *ptr; }
+            constexpr rb_iterator(const rb_iterator&) noexcept = default;
+
+            constexpr rb_iterator&  operator=(const rb_iterator&) noexcept = default;
+
+            constexpr reference     operator++() noexcept { advance_ptr(); return **this; }
+            constexpr reference     operator--() noexcept { backtrack_ptr(); return **this; }
+
+            constexpr reference     operator*() noexcept { return *ptr; }
+            constexpr pointer       operator->() noexcept { return ptr; }
+
+            constexpr bool          operator==(const rb_iterator& rhs) const noexcept = default;
+
+            // We cannot support other Legacy*Iterators, since we are not default-constructible
+
+            constexpr value_type    operator++(int) { value_type tmp{*this}; advance_ptr(); return tmp; }
+            constexpr value_type    operator--(int) { value_type tmp{*this}; backtrack_ptr(); return tmp; }
+
 
         private:
-            void advance_ptr() noexcept {
-                ref.get_read_head();
+            constexpr void advance_ptr() noexcept {
+                if (ptr == nullptr)
+                    ptr = ref->get_read_head();
+                else {
+                    ptr = ptr == ref->data() + ref->capacity() - 1 ? ref->data() : ptr + 1;
+                    if (ptr == ref->get_write_head() || ptr == ref->get_read_head()) {
+                        ptr = nullptr;
+                    }
+                }
             }
 
-            target_reference ref;
-            pointer ptr;
+            constexpr void backtrack_ptr() noexcept {
+                if (ptr == nullptr)
+                    ptr = ref->get_write_head();
+                else {
+                    ptr = ptr == ref.data() ? ref->get_write_ptr() : ptr - 1;
+                    if (ptr == ref->get_write_head())
+                        ptr = nullptr;
+                }
+            }
+
+            target_pointer ref;
+            pointer ptr = ref->get_read_head();
     };
 }
 

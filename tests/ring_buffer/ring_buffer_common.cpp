@@ -113,8 +113,41 @@ TEST_SUITE("ring buffer common functionality") {
     }
 
     TEST_CASE_TEMPLATE("iterating", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
-        T test_buffer;
-        auto iter = test_buffer.begin();
+        SUBCASE("Range-based for") {
+            T test_buffer;
+            test_buffer.push(0);
+            test_buffer.push(1);
+            test_buffer.push(2);
+            test_buffer.push(3);
+            test_buffer.push(4);
+
+            int expected = 0;
+            for (int i : test_buffer)
+                CHECK(i == expected++);
+        }
+
+        SUBCASE("Wrapping") {
+            T test_buffer;
+            test_buffer.push(0); // make sure dynamic buffer is initialised
+            int i = test_buffer.pop(); (void)i;
+            int count = 0;
+            int cap = static_cast<int>(test_buffer.capacity());
+            for (int i = 0; i < cap; ++i)
+                if (i < cap / 2)
+                    test_buffer.push(0);
+                else
+                    test_buffer.push(i - cap / 2);
+
+            for (int i = 0; i < cap / 2; ++i) {
+                int j = test_buffer.pop(); (void)j;
+            }
+
+            for (int i = cap / 2; i < cap; ++i)
+                test_buffer.push(i);
+
+            for (int i : test_buffer)
+                CHECK(i == count++);
+        }
     }
 }
 /*
