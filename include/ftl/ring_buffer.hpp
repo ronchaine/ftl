@@ -421,6 +421,8 @@ namespace ftl
 
     };
 
+    // Cannot use iterator concepts before Defect report P2325R3 is fixed in compilers,
+    // we are not default-constructible
     template <typename T, typename Storage> template <bool Is_Const>
     class ring_buffer<T, Storage>::rb_iterator
     {
@@ -448,8 +450,6 @@ namespace ftl
             constexpr pointer       operator->() noexcept { return ptr; }
 
             constexpr bool          operator==(const rb_iterator& rhs) const noexcept = default;
-
-            // We cannot support other Legacy*Iterators, since we are not default-constructible
 
             constexpr value_type    operator++(int) { value_type tmp{*this}; advance_ptr(); return tmp; }
             constexpr value_type    operator--(int) { value_type tmp{*this}; backtrack_ptr(); return tmp; }
