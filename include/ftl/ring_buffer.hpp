@@ -388,7 +388,7 @@ namespace ftl
             constexpr ring_buffer() = default;
 
             // iterators
-            constexpr iterator begin();
+            constexpr iterator begin() { return iterator{*this, this->get_read_head()}; }
             constexpr const_iterator begin() const;
 
             constexpr iterator end();
@@ -419,6 +419,32 @@ namespace ftl
 
             [[nodiscard]] constexpr bool is_contiguous() const noexcept { return detail::ring_buffer_storage<T, Storage>::is_contiguous(); }
 
+    };
+
+    template <typename T, typename Storage> template <bool Is_Const>
+    class ring_buffer<T, Storage>::rb_iterator
+    {
+        using target_reference = typename std::conditional<Is_Const, const ring_buffer<T, Storage>&, ring_buffer<T, Storage>&>::type;
+
+        public:
+            using value_type        = ring_buffer<T, Storage>::value_type;
+            using pointer           = typename std::conditional<Is_Const, const T*, T*>::type;
+            using difference_type   = std::ptrdiff_t;
+
+            using reference         = typename std::conditional<Is_Const, const value_type&, value_type&>::type;
+
+            rb_iterator(target_reference ref, pointer beg) : ref{ref}, ptr{beg} {}
+
+            rb_iterator&    operator++() { advance_ptr(); }
+            reference       operator*() { return *ptr; }
+
+        private:
+            void advance_ptr() noexcept {
+                ref.get_read_head();
+            }
+
+            target_reference ref;
+            pointer ptr;
     };
 }
 

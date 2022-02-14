@@ -111,6 +111,11 @@ TEST_SUITE("ring buffer common functionality") {
             CHECK(test_buffer.size() == test_buffer.capacity());
         }
     }
+
+    TEST_CASE_TEMPLATE("iterating", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
+        T test_buffer;
+        auto iter = test_buffer.begin();
+    }
 }
 /*
     Copyright 2022 Jari Ronkainen
