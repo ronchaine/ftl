@@ -72,6 +72,48 @@ TEST_SUITE("ring buffer common functionality") {
         }
     }
 
+    TEST_CASE_TEMPLATE("clear", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
+        SUBCASE("Clearing a buffer doesn't affect its capacity") {
+            T test_buffer;
+            test_buffer.push(0);
+
+            size_t old_cap = test_buffer.capacity();
+            test_buffer.clear();
+
+            CHECK(test_buffer.capacity() == old_cap);
+        }
+
+        SUBCASE("Clearing a buffer makes it empty") {
+            T test_buffer;
+            test_buffer.push(0);
+            test_buffer.push(1);
+
+            test_buffer.clear();
+
+            CHECK(test_buffer.size() == 0);
+            CHECK(test_buffer.is_empty());
+            CHECK(not test_buffer.is_full());
+        }
+
+        // We want this to keep the data contiguous as much as possible
+        SUBCASE("Clearing a buffer resets its write address") {
+            T test_buffer;
+
+            test_buffer.push(0);
+            test_buffer.push(1);
+
+            int* orig_ptr = &(*test_buffer.begin());
+            test_buffer.clear();
+
+            test_buffer.push(1);
+            test_buffer.push(2);
+
+            int* new_ptr = &(*test_buffer.begin());
+
+            CHECK(orig_ptr == new_ptr);
+        }
+    }
+
     TEST_CASE_TEMPLATE("capacity, size and emptiness / fullness", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
         SUBCASE("Default-constructed ring buffer is empty") {
             T fresh_unmodified_buffer;

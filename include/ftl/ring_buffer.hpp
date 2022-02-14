@@ -74,7 +74,7 @@ namespace ftl
                     allocator.deallocate(data_begin, get_size());
                 };
 
-                constexpr inline bool is_empty() const noexcept { return write_head == read_head; }
+                constexpr inline bool is_empty() const noexcept { return (write_head == read_head) || read_head == nullptr; }
                 constexpr inline bool is_full() const noexcept { return write_head == nullptr; }
 
                 constexpr inline void advance_write_head() noexcept {
@@ -92,6 +92,30 @@ namespace ftl
                 constexpr inline void release() noexcept requires (!std::is_trivially_destructible_v<T>) {
                     if constexpr(not std::is_trivially_destructible_v<T>)
                         get_read_head()->~T();
+                }
+
+                constexpr void resize(size_type new_size) {
+                    if (new_size <= get_capacity())
+                        return;
+
+                    pointer old_data_begin = data_begin;
+                    pointer new_data_ptr = allocator.allocate(new_size);
+
+                    size_t it = 0;
+                    if (old_data_begin != nullptr) {
+                        while (read_head != write_head) {
+                            if constexpr(std::is_move_assignable_v<T>)
+                                new_data_ptr[it++] = static_cast<T&&>(*read_head);
+                            else 
+                                new_data_ptr[it++] = *read_head;
+                            advance_read_head();
+                        }
+                    }
+                    data_begin = new_data_ptr;
+                    data_end = new_data_ptr + new_size;
+
+                    read_head = data_begin;
+                    write_head = data_begin + it;
                 }
 
                 constexpr pointer data() noexcept { return data_begin; }
@@ -115,27 +139,8 @@ namespace ftl
                 constexpr static size_t grow_factor     = 2;
 
                 inline void grow() {
-                    pointer old_data_begin = data_begin;
-
                     const size_t new_size = get_capacity() == 0 ? initial_size : get_capacity() * grow_factor;
-
-                    pointer new_data_ptr = allocator.allocate(new_size);
-
-                    size_t it = 0;
-                    if (old_data_begin != nullptr) {
-                        while (read_head != write_head) {
-                            if constexpr(std::is_move_assignable_v<T>)
-                                new_data_ptr[it++] = static_cast<T&&>(*read_head);
-                            else 
-                                new_data_ptr[it++] = *read_head;
-                            advance_read_head();
-                        }
-                    }
-                    data_begin = new_data_ptr;
-                    data_end = new_data_ptr + new_size;
-
-                    read_head = data_begin;
-                    write_head = data_begin + it;
+                    resize(new_size);
                 }
 
                 constexpr inline pointer& get_write_head() noexcept { return write_head; }
@@ -359,6 +364,17 @@ namespace ftl
                 return T{val};
             }
 
+            constexpr void clear() noexcept {
+                if constexpr(std::is_trivially_destructible_v<T>) {
+                    while(get_read_head() != get_write_head()) {
+                        release();
+                        advance_read_head();
+                    }
+                }
+                get_read_head() = nullptr;
+                get_write_head() = data();
+            }
+
             constexpr bool is_contiguous() const noexcept {
                 if (get_read_head() == nullptr)
                     return true;
@@ -404,9 +420,12 @@ namespace ftl
             template <typename U> requires std::is_convertible_v<U, T>
             constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
 
-            constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
-
             [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
+
+            constexpr void resize(size_type count) requires detail::ring_buffer_storage<T, Storage>::is_dynamic { detail::ring_buffer_storage<T, Storage>::resize(count); }
+            constexpr void resize(size_type count) const noexcept requires (!detail::ring_buffer_storage<T, Storage>::is_dynamic) {}
+            constexpr void clear() noexcept { detail::ring_buffer_details<T, Storage>::clear(); }
+            constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
             // FIXME: This causes an extra copy.
             [[nodiscard]] constexpr T pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
