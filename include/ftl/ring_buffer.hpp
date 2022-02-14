@@ -74,7 +74,7 @@ namespace ftl
                     allocator.deallocate(data_begin, get_size());
                 };
 
-                constexpr inline bool is_empty() const noexcept { return (write_head == read_head) || read_head == nullptr; }
+                constexpr inline bool is_empty() const noexcept { return write_head == read_head; }
                 constexpr inline bool is_full() const noexcept { return write_head == nullptr; }
 
                 constexpr inline void advance_write_head() noexcept {
@@ -87,7 +87,9 @@ namespace ftl
                     read_head = read_head == data() + get_capacity() - 1 ? data() : read_head + 1;
                 }
 
-                constexpr inline void release() const noexcept {
+                constexpr inline void release() const noexcept requires std::is_trivially_destructible_v<T> {}
+
+                constexpr inline void release() noexcept requires (!std::is_trivially_destructible_v<T>) {
                     if constexpr(not std::is_trivially_destructible_v<T>)
                         get_read_head()->~T();
                 }
@@ -117,7 +119,7 @@ namespace ftl
 
                     const size_t new_size = get_capacity() == 0 ? initial_size : get_capacity() * grow_factor;
 
-                    T* new_data_ptr = allocator.allocate(new_size);
+                    pointer new_data_ptr = allocator.allocate(new_size);
 
                     size_t it = 0;
                     if (old_data_begin != nullptr) {
@@ -189,8 +191,9 @@ namespace ftl
                     if (write_head == nullptr)
                         return StaticSize;
 
-                    if (write_head == read_head || read_head == nullptr)
+                    if (is_empty())
                         return 0;
+
                     return write_head > read_head
                         ? static_cast<size_type>(write_head - read_head)
                         : static_cast<size_type>(StaticSize - (read_head - write_head));
