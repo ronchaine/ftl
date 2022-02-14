@@ -346,7 +346,6 @@ namespace ftl
                 #endif
                 assert(not is_empty());
 
-                // Does this need launder?
                 T val = *get_read_head();
                 if (get_write_head() == nullptr)
                     get_write_head() = get_read_head();
@@ -405,6 +404,8 @@ namespace ftl
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
             [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
+
+            // FIXME: This causes an extra copy.
             [[nodiscard]] constexpr T pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
 
             // queries
