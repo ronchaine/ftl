@@ -14,7 +14,7 @@
 #else
 // TODO:  we probably want our own assert since this is not in
 // standard either, both gcc and clang provide it in freestanding
-// though
+// though (at least for x86_64-linux-*)
 # include <assert.h>
 #endif
 
@@ -428,7 +428,7 @@ namespace ftl
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
             // FIXME: This causes an extra copy.
-            [[nodiscard]] constexpr T pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
+            [[nodiscard]] constexpr value_type pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
 
             // queries
             [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }

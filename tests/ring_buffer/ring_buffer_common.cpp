@@ -154,7 +154,7 @@ TEST_SUITE("ring buffer common functionality") {
         }
     }
 
-    TEST_CASE_TEMPLATE("iterating", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
+    TEST_CASE_TEMPLATE("iterators", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
         SUBCASE("Range-based for") {
             T test_buffer;
             test_buffer.push(0);
