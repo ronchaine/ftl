@@ -394,12 +394,19 @@ namespace ftl
             using size_type         = std::size_t;
             using pointer           = typename detail::ring_buffer_storage<T, Storage>::pointer;
 
+            using reference         = T&;
+            using const_reference   = const T&;
+
+            using difference_type   = std::ptrdiff_t;
+
             using allocator_type    = typename detail::ring_buffer_storage<T, Storage>::allocator_type;
 
             template <bool is_const>
             class rb_iterator;
             using iterator = rb_iterator<false>;
             using const_iterator = rb_iterator<true>;
+
+            using detail::ring_buffer_storage<T, Storage>::is_dynamic;
 
             constexpr ring_buffer() = default;
 
@@ -418,12 +425,15 @@ namespace ftl
             constexpr void push(const U& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->construct(elem); }
 
             template <typename U> requires std::is_convertible_v<U, T>
+            constexpr void push_overwrite(U&& elem) noexcept(std::is_nothrow_move_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
+
+            template <typename U> requires std::is_convertible_v<U, T>
             constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
 
             [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
 
-            constexpr void reserve(size_type count) requires detail::ring_buffer_storage<T, Storage>::is_dynamic { detail::ring_buffer_storage<T, Storage>::reserve(count); }
-            constexpr void reserve(size_type count) const noexcept requires (!detail::ring_buffer_storage<T, Storage>::is_dynamic) {}
+            constexpr void reserve(size_type count) requires is_dynamic { detail::ring_buffer_storage<T, Storage>::reserve(count); }
+            constexpr void reserve(size_type count) const noexcept requires (!is_dynamic) {}
             constexpr void clear() noexcept { detail::ring_buffer_details<T, Storage>::clear(); }
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
