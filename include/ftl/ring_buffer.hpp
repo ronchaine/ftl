@@ -310,7 +310,7 @@ namespace ftl
                     get_read_head() = data();
 
                 if constexpr(is_dynamic) {
-                    if (is_full())
+                    if ((not allow_overwrite) && is_full())
                         ring_buffer_storage<T, Storage>::grow();
                 } else {
                     if (is_full()) {
