@@ -32,26 +32,30 @@ is not `DefaultConstructible`)
 | -------           | -----------                                                       |
 | `is_dynamic`      | `true` if is statically allocated, `false` if using allocator     |
 
-| Functions                     |                                                                               |
-| -------                       | -----------                                                                   |
-| iterators                     |                                                                               |
-| `begin()`                     | return iterator to the  beginning of buffer                                   |
-| `end()`                       | return iterator to the end of buffer                                          |
-| modifiers                     |                                                                               |
-| `push(T&&)`                   | add an element to the end of the array                                        |
-| `push(const T&)`              |                                                                               |
-| `push_overwrite(T&&)`         | add an element to the end of the array, overwriting the first instead of      |
-| `push_overwrite(const T&)`    | resizing if the container is full                                             |
-| `pop()`                       | read first element and destroy it                                             |
-| `reserve(size_type)`          | reserves size for at least given number of elements, no-op in static version  |
-| `clear()`                     | empties the array, leaving memory reserved                                    |
-| `swap(ring_buffer&)`          | swaps ring buffer with another                                                |
-| queries                       |                                                                               |
-| `size()`                      | returns number of elements stored in the container                            |
-| `capacity()`                  | returns number of elements the container has reserved memory for              |
-| `is_empty()`                  | `true` if the container has no stored elements, otherwise `false`             |
-| `is_full()`                   | `true` if adding elements to the container would need reallocation            |
-| `is_contiguous()`             | `true` if all the elements in the array are stored contiguously in-order      |
+| Functions                     |                                                                                   |
+| -------                       | -----------                                                                       |
+| iterators                     |                                                                                   |
+| `begin()`                     | return iterator to the  beginning of buffer                                       |
+| `end()`                       | return iterator to the end of buffer                                              |
+| element access                |                                                                                   |
+| `front()`                     | get reference to the first element without modifying the buffer                   |
+| `back()`                      | get reference to the last element without modifying the buffer                    |
+| `operator[](size_type)`       | get reference to the nth element without modifying the buffer, wrapping around    |
+| modifiers                     |                                                                                   |
+| `push(T&&)`                   | add an element to the end of the array                                            |
+| `push(const T&)`              |                                                                                   |
+| `push_overwrite(T&&)`         | add an element to the end of the array, overwriting the first instead of          |
+| `push_overwrite(const T&)`    | resizing if the container is full                                                 |
+| `pop()`                       | read first element and destroy it                                                 |
+| `reserve(size_type)`          | reserves size for at least given number of elements, no-op in static version      |
+| `clear()`                     | empties the array, leaving memory reserved                                        |
+| `swap(ring_buffer&)`          | swaps ring buffer with another                                                    |
+| queries                       |                                                                                   |
+| `size()`                      | returns number of elements stored in the container                                |
+| `capacity()`                  | returns number of elements the container has reserved memory for                  |
+| `is_empty()`                  | `true` if the container has no stored elements, otherwise `false`                 |
+| `is_full()`                   | `true` if adding elements to the container would need reallocation                |
+| `is_contiguous()`             | `true` if all the elements in the array are stored contiguously in-order          |
 
 ## Example use
 

@@ -154,6 +154,65 @@ TEST_SUITE("ring buffer common functionality") {
         }
     }
 
+    TEST_CASE_TEMPLATE("push_overwrite()", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
+        SUBCASE("push_overwrite() overwrites the first element and moves the read position") {
+            T test_buffer;
+            test_buffer.push(0);
+            int cap = static_cast<int>(test_buffer.capacity());
+            for (int i = 1; i < cap; ++i)
+                test_buffer.push(i);
+
+            test_buffer.push_overwrite(42);
+            CHECK(*test_buffer.begin() == 1);
+            CHECK(*(--test_buffer.end()) == 42);
+
+            CHECK(test_buffer.capacity() == cap);
+        }
+    }
+
+    TEST_CASE_TEMPLATE("Element Access", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
+        SUBCASE("Front / back matches expected element") {
+            T test_buffer;
+            test_buffer.push(0);
+            for (int i = 1; i < static_cast<int>(test_buffer.capacity()); ++i)
+                test_buffer.push(i);
+
+            CHECK(test_buffer.front() == 0);
+            CHECK(test_buffer.back() == test_buffer.capacity() - 1);
+
+            test_buffer.push_overwrite(42);
+            CHECK(test_buffer.front() == 1);
+            CHECK(test_buffer.back() == 42);
+        }
+
+        SUBCASE("Front / back matches begin() and end()") {
+            T test_buffer;
+            test_buffer.push(0);
+            for (int i = 1; i < static_cast<int>(test_buffer.capacity()); ++i)
+                test_buffer.push(i);
+
+            CHECK(test_buffer.front() == *test_buffer.begin());
+            CHECK(test_buffer.back() == *(--test_buffer.end()));
+
+            test_buffer.push_overwrite(42);
+            CHECK(test_buffer.front() == *test_buffer.begin());
+            CHECK(test_buffer.back() == *(--test_buffer.end()));
+        }
+
+        SUBCASE("Subscript operator") {
+            T test_buffer;
+            test_buffer.push(0);
+            for (int i = 1; i < static_cast<int>(test_buffer.capacity()); ++i)
+                test_buffer.push(i);
+
+            for (size_t i = 0; i < test_buffer.capacity(); ++i) {
+                CHECK(test_buffer[i] == i);
+                CHECK(test_buffer[i + test_buffer.capacity()] == i);
+                CHECK(test_buffer[i - test_buffer.capacity()] == i);
+            }
+        }
+    }
+
     TEST_CASE_TEMPLATE("iterators", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {
         SUBCASE("Range-based for") {
             T test_buffer;

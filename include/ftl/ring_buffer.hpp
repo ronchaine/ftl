@@ -292,6 +292,7 @@ namespace ftl
         {
             using value_type = typename ring_buffer_storage<T, Storage>::value_type;
             using size_type = typename ring_buffer_storage<T, Storage>::size_type;
+            using difference_type = std::ptrdiff_t;
 
             using ring_buffer_storage<T, Storage>::is_dynamic;
             using ring_buffer_storage<T, Storage>::get_write_head;
@@ -312,21 +313,22 @@ namespace ftl
                 if constexpr(is_dynamic) {
                     if ((not allow_overwrite) && is_full())
                         ring_buffer_storage<T, Storage>::grow();
-                } else {
-                    if (is_full()) {
-                        if constexpr(not allow_overwrite) {
-                            #ifdef __cpp_exceptions
-                                throw std::out_of_range("ring buffer full");
-                            #endif
-                            assert(not is_full());
-                        }
-
-                        // just overwrite if NDEBUG and no exceptions
-                        release();
-                        get_write_head() = get_read_head();
-                        advance_read_head();
-                    }
                 }
+
+                if (is_full()) {
+                    if constexpr(not allow_overwrite) {
+                        #ifdef __cpp_exceptions
+                            throw std::out_of_range("ring buffer full");
+                        #endif
+                        assert(not is_full());
+                    }
+
+                    // just overwrite if NDEBUG and no exceptions
+                    release();
+                    get_write_head() = get_read_head();
+                    advance_read_head();
+                }
+
                 ::new (std::remove_reference_t<T*>(get_write_head())) value_type { FTL_FORWARD(elem) };
                 advance_write_head();
             }
@@ -383,6 +385,28 @@ namespace ftl
                 else
                     return get_read_head() < get_write_head();
             };
+
+            constexpr value_type& nth_element(size_type index) noexcept {
+                std::ptrdiff_t rel_index = index;
+                while(rel_index >= static_cast<std::ptrdiff_t>(ring_buffer_storage<T, Storage>::get_capacity()))
+                    rel_index -= ring_buffer_storage<T, Storage>::get_capacity();
+
+                while(rel_index < 0)
+                    rel_index += ring_buffer_storage<T, Storage>::get_capacity();
+
+                return *(data() + rel_index);
+            }
+
+            constexpr const value_type& nth_element(size_type index) const noexcept {
+                std::ptrdiff_t rel_index = index;
+                while(rel_index >= static_cast<std::ptrdiff_t>(ring_buffer_storage<T, Storage>::get_capacity()))
+                    rel_index -= ring_buffer_storage<T, Storage>::get_capacity();
+
+                while(rel_index < 0)
+                    rel_index += ring_buffer_storage<T, Storage>::get_capacity();
+
+                return *(data() + rel_index);
+            }
         };
     }
 
@@ -439,6 +463,15 @@ namespace ftl
             constexpr void clear() noexcept { detail::ring_buffer_details<T, Storage>::clear(); }
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
+            // element access
+            [[nodiscard]] constexpr reference front() noexcept { return *begin(); }
+            [[nodiscard]] constexpr const_reference front() const noexcept { return *begin(); }
+            [[nodiscard]] constexpr reference back() noexcept { return *(--end()); }
+            [[nodiscard]] constexpr const_reference back() const noexcept { return *(--end()); }
+
+            [[nodiscard]] constexpr reference operator[](size_type index) noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
+            [[nodiscard]] constexpr const_reference operator[](size_type index) const noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
+
             // queries
             [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }
             [[nodiscard]] constexpr size_type capacity() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_capacity(); }
@@ -471,16 +504,16 @@ namespace ftl
 
             constexpr rb_iterator&  operator=(const rb_iterator&) noexcept = default;
 
-            constexpr reference     operator++() noexcept { advance_ptr(); return **this; }
-            constexpr reference     operator--() noexcept { backtrack_ptr(); return **this; }
+            constexpr rb_iterator&  operator++() noexcept { advance_ptr(); return *this; }
+            constexpr rb_iterator&  operator--() noexcept { backtrack_ptr(); return *this; }
 
             constexpr reference     operator*() noexcept { return *ptr; }
             constexpr pointer       operator->() noexcept { return ptr; }
 
             constexpr bool          operator==(const rb_iterator& rhs) const noexcept = default;
 
-            constexpr value_type    operator++(int) { value_type tmp{*this}; advance_ptr(); return tmp; }
-            constexpr value_type    operator--(int) { value_type tmp{*this}; backtrack_ptr(); return tmp; }
+            constexpr value_type    operator++(int) noexcept(std::is_nothrow_copy_constructible_v<value_type>) { value_type tmp{*this}; advance_ptr(); return tmp; }
+            constexpr value_type    operator--(int) noexcept(std::is_nothrow_copy_constructible_v<value_type>) { value_type tmp{*this}; backtrack_ptr(); return tmp; }
 
 
         private:
@@ -496,10 +529,12 @@ namespace ftl
             }
 
             constexpr void backtrack_ptr() noexcept {
-                if (ptr == nullptr)
-                    ptr = ref->get_write_head();
-                else {
-                    ptr = ptr == ref.data() ? ref->get_write_ptr() : ptr - 1;
+                if (ptr == nullptr) {
+                    ptr = ref->get_read_head() + ref->size() - 1;
+                    if (ptr >= ref->data() + ref->capacity())
+                        ptr -= ref->capacity();
+                } else {
+                    ptr = ptr == ref->data() ? ref->get_write_head() - 1 : ptr - 1;
                     if (ptr == ref->get_write_head())
                         ptr = nullptr;
                 }
