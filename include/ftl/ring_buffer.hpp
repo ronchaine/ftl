@@ -431,14 +431,13 @@ namespace ftl
             constexpr void push_overwrite(const T& elem) noexcept(std::is_nothrow_copy_constructible<T>::value) { this->template construct<U, true>(FTL_FORWARD(elem)); }
 
             [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
+            // FIXME: This causes an extra copy.
+            [[nodiscard]] constexpr value_type pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
 
             constexpr void reserve(size_type count) requires is_dynamic { detail::ring_buffer_storage<T, Storage>::reserve(count); }
             constexpr void reserve(size_type count) const noexcept requires (!is_dynamic) {}
             constexpr void clear() noexcept { detail::ring_buffer_details<T, Storage>::clear(); }
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
-
-            // FIXME: This causes an extra copy.
-            [[nodiscard]] constexpr value_type pop() requires (!std::is_move_assignable_v<T>) { return this->read_copy_delete(); }
 
             // queries
             [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }
