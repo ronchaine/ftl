@@ -94,7 +94,7 @@ namespace ftl
                         get_read_head()->~T();
                 }
 
-                constexpr void resize(size_type new_size) {
+                constexpr void reserve(size_type new_size) {
                     if (new_size <= get_capacity())
                         return;
 
@@ -140,7 +140,7 @@ namespace ftl
 
                 inline void grow() {
                     const size_t new_size = get_capacity() == 0 ? initial_size : get_capacity() * grow_factor;
-                    resize(new_size);
+                    reserve(new_size);
                 }
 
                 constexpr inline pointer& get_write_head() noexcept { return write_head; }
@@ -422,8 +422,8 @@ namespace ftl
 
             [[nodiscard]] constexpr T&& pop() requires std::is_move_assignable_v<T> { return this->read_delete(); }
 
-            constexpr void resize(size_type count) requires detail::ring_buffer_storage<T, Storage>::is_dynamic { detail::ring_buffer_storage<T, Storage>::resize(count); }
-            constexpr void resize(size_type count) const noexcept requires (!detail::ring_buffer_storage<T, Storage>::is_dynamic) {}
+            constexpr void reserve(size_type count) requires detail::ring_buffer_storage<T, Storage>::is_dynamic { detail::ring_buffer_storage<T, Storage>::reserve(count); }
+            constexpr void reserve(size_type count) const noexcept requires (!detail::ring_buffer_storage<T, Storage>::is_dynamic) {}
             constexpr void clear() noexcept { detail::ring_buffer_details<T, Storage>::clear(); }
             constexpr void swap(ring_buffer& rhs) { swap(*this, rhs); }
 
