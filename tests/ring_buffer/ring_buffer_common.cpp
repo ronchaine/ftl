@@ -211,6 +211,17 @@ TEST_SUITE("ring buffer common functionality") {
                 CHECK(test_buffer[i - test_buffer.capacity()] == i);
             }
         }
+
+        SUBCASE("Subscript with negative values") {
+            T test_buffer;
+            test_buffer.push(0);
+            for (int i = 1; i < static_cast<int>(test_buffer.capacity()); ++i)
+                test_buffer.push(i);
+
+            for (size_t i = 0; i < test_buffer.capacity(); ++i) {
+                CHECK(test_buffer[-i] == test_buffer[test_buffer.capacity() - i]);
+            }
+        }
     }
 
     TEST_CASE_TEMPLATE("iterators", T, static_ring_buffer<int>, std_alloc_ring_buffer<int>) {

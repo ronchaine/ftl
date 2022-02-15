@@ -386,8 +386,7 @@ namespace ftl
                     return get_read_head() < get_write_head();
             };
 
-            constexpr value_type& nth_element(size_type index) noexcept {
-                std::ptrdiff_t rel_index = index;
+            constexpr value_type& nth_element(difference_type rel_index) noexcept {
                 while(rel_index >= static_cast<std::ptrdiff_t>(ring_buffer_storage<T, Storage>::get_capacity()))
                     rel_index -= ring_buffer_storage<T, Storage>::get_capacity();
 
@@ -397,8 +396,7 @@ namespace ftl
                 return *(data() + rel_index);
             }
 
-            constexpr const value_type& nth_element(size_type index) const noexcept {
-                std::ptrdiff_t rel_index = index;
+            constexpr const value_type& nth_element(difference_type rel_index) const noexcept {
                 while(rel_index >= static_cast<std::ptrdiff_t>(ring_buffer_storage<T, Storage>::get_capacity()))
                     rel_index -= ring_buffer_storage<T, Storage>::get_capacity();
 
@@ -469,8 +467,8 @@ namespace ftl
             [[nodiscard]] constexpr reference back() noexcept { return *(--end()); }
             [[nodiscard]] constexpr const_reference back() const noexcept { return *(--end()); }
 
-            [[nodiscard]] constexpr reference operator[](size_type index) noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
-            [[nodiscard]] constexpr const_reference operator[](size_type index) const noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
+            [[nodiscard]] constexpr reference operator[](difference_type index) noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
+            [[nodiscard]] constexpr const_reference operator[](difference_type index) const noexcept { return detail::ring_buffer_details<T, Storage>::nth_element(index); }
 
             // queries
             [[nodiscard]] constexpr size_type size() const noexcept { return detail::ring_buffer_storage<T, Storage>::get_size(); }
