@@ -43,8 +43,7 @@ is not `DefaultConstructible`)
 | `push_overwrite(T&&)`         | add an element to the end of the array, overwriting the first instead of      |
 | `push_overwrite(const T&)`    | resizing if the container is full                                             |
 | `pop()`                       | read first element and destroy it                                             |
-| `reserve(size_type)`          | for allocator-powered buffers, makes sure there is enough space for at least  |
-|                               | given number of elements.  For static buffers, this is a no-op                |
+| `reserve(size_type)`          | reserves size for at least given number of elements, no-op in static version  |
 | `clear()`                     | empties the array, leaving memory reserved                                    |
 | `swap(ring_buffer&)`          | swaps ring buffer with another                                                |
 | queries                       |                                                                               |
