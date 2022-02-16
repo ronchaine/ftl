@@ -40,7 +40,7 @@ is not `DefaultConstructible`)
 | element access                |                                                                                   |
 | `front()`                     | get reference to the first element without modifying the buffer                   |
 | `back()`                      | get reference to the last element without modifying the buffer                    |
-| `operator[](size_type)`       | get reference to the nth element without modifying the buffer, wrapping around    |
+| `operator[](difference_type)` | get reference to the nth element without modifying the buffer, wrapping around    |
 | modifiers                     |                                                                                   |
 | `push(T&&)`                   | add an element to the end of the array                                            |
 | `push(const T&)`              |                                                                                   |
