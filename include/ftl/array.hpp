@@ -12,6 +12,9 @@ namespace ftl
     template <typename T, std::size_t... Dimensions>
     class array
     {
+        template <std::size_t Depth, bool IsConst>
+        struct array_access_proxy;
+
         public:
             using value_type        = T;
             using reference         = T&;
@@ -31,11 +34,21 @@ namespace ftl
             explicit constexpr array(Values&&... v) noexcept : data_array{ FTL_FORWARD(v)... } {}
 
             // element access
-            template <size_type Depth = 1>
-            [[nodiscard]] constexpr auto operator[](size_type index) noexcept;
+            [[nodiscard]] constexpr auto operator[](size_type index) noexcept requires (dimension > 1) {
+                return array_access_proxy<1, false>(*this, index);
+            }
 
-            template <size_type Depth = 1>
-            [[nodiscard]] constexpr auto operator[](size_type index) const noexcept;
+            [[nodiscard]] constexpr const auto operator[](size_type index) const noexcept requires (dimension > 1) {
+                return array_access_proxy<1, true>(*this, index);
+            }
+
+            [[nodiscard]] constexpr reference operator[](size_type index) noexcept requires (sizeof...(Dimensions) == 1) {
+                return data_array[index];
+            }
+
+            [[nodiscard]] constexpr const_reference operator[](size_type index) const noexcept requires (sizeof...(Dimensions) == 1) {
+                return data_array[index];
+            }
 
             template <typename... Dims>
             [[nodiscard]] constexpr reference at(Dims... d) noexcept requires (sizeof...(Dims) == sizeof...(Dimensions))
@@ -78,9 +91,6 @@ namespace ftl
             [[nodiscard]] constexpr uint64_t hash() const noexcept { return ::ftl::hash(*this); }
 
         private:
-            template <std::size_t Depth>
-            struct array_access_proxy;
-
             template <typename... Dims>
             constexpr static size_type calc_array_index(size_type idx, Dims... d) noexcept
             {
@@ -114,51 +124,31 @@ namespace ftl
     }
 
     template <typename T, std::size_t... Dimensions>
-    template <std::size_t Depth>
+    template <std::size_t Depth, bool IsConst>
     struct array<T, Dimensions...>::array_access_proxy
     {
-        const array&    ref;
+        array&          ref;
         size_type       cindex;
 
-        constexpr explicit array_access_proxy(array& arr, std::size_t cindex) noexcept : ref(arr), cindex(cindex) {}
-        constexpr explicit array_access_proxy(const array& arr, std::size_t cindex) noexcept : ref(arr), cindex(cindex) {}
+        constexpr explicit array_access_proxy(array& arr, std::size_t cindex) noexcept requires (!IsConst) : ref(arr), cindex(cindex) {}
+        constexpr explicit array_access_proxy(const array& arr, std::size_t cindex) noexcept requires (IsConst): ref(arr), cindex(cindex) {}
 
-        constexpr auto operator[](std::size_t index) noexcept
+        constexpr reference operator[](std::size_t index) && noexcept 
+            requires (!IsConst) && (Depth + 1 == array::dimension)
         {
-            if constexpr (Depth == sizeof...(Dimensions))
-                return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];
-            else
-                return array_access_proxy<Depth+1>(ref, index + (cindex * ref.dims[Depth-1]));
+            return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];
         }
 
-        constexpr auto& operator[](std::size_t index) const noexcept
+        constexpr const_reference operator[](std::size_t index) const && noexcept
+            requires (Depth + 1 == array::dimension) && IsConst
         {
-            if constexpr (Depth == sizeof...(Dimensions))
-                return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];
-            else
-                return array_access_proxy<Depth+1>(ref, index + (cindex * ref.dims[Depth-1]));
+            return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];
+        }
+
+        constexpr auto&& operator[](std::size_t index) const && noexcept requires (Depth + 1 < sizeof...(Dimensions)) {
+            return array_access_proxy<Depth+1, IsConst>(ref, index + (cindex * ref.dim_size[Depth-1]));
         }
     };
-
-    template <typename T, std::size_t... Dimensions>
-    template <std::size_t Depth>
-    constexpr auto array<T, Dimensions...>::operator[](size_type index) noexcept
-    {
-        if constexpr (Depth == sizeof...(Dimensions))
-            return reference(data_array[index]);
-        else
-            return array_access_proxy<Depth+1>(*this, index);
-    }
-
-    template <typename T, std::size_t... Dimensions>
-    template <std::size_t Depth>
-    constexpr auto array<T, Dimensions...>::operator[](size_type index) const noexcept
-    {
-        if constexpr (Depth == sizeof...(Dimensions))
-            return const_reference(data_array[index]);
-        else
-            return array_access_proxy<Depth+1>(*this, index);
-    }
 
     template <typename T, std::size_t... Dimensions>
     constexpr void array<T, Dimensions...>::fill(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
