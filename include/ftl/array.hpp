@@ -127,7 +127,9 @@ namespace ftl
     template <std::size_t Depth, bool IsConst>
     struct array<T, Dimensions...>::array_access_proxy
     {
-        array&          ref;
+        using ref_type = typename std::conditional<IsConst, const array&, array&>::type;
+
+        ref_type        ref;
         size_type       cindex;
 
         constexpr explicit array_access_proxy(array& arr, std::size_t cindex) noexcept requires (!IsConst) : ref(arr), cindex(cindex) {}
