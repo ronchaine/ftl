@@ -40,14 +40,14 @@ namespace ftl
             template <typename... Dims>
             [[nodiscard]] constexpr reference at(Dims... d) noexcept requires (sizeof...(Dims) == sizeof...(Dimensions))
             {
-                static_assert(each_convertible_to_size_t(d...));
+                static_assert(each_convertible_to<size_type, Dims...>());
                 return data_array[calc_array_index(d...)];
             }
 
             template <typename... Dims>
             [[nodiscard]] constexpr const_reference at(Dims... d) const noexcept requires (sizeof...(Dims) == sizeof...(Dimensions))
             {
-                static_assert(each_convertible_to_size_t(d...));
+                static_assert(each_convertible_to<size_type, Dims...>());
                 return data_array[calc_array_index(d...)];
             }
 
@@ -131,7 +131,7 @@ namespace ftl
                 return array_access_proxy<Depth+1>(ref, index + (cindex * ref.dims[Depth-1]));
         }
 
-        constexpr auto operator[](std::size_t index) const noexcept
+        constexpr auto& operator[](std::size_t index) const noexcept
         {
             if constexpr (Depth == sizeof...(Dimensions))
                 return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];

@@ -12,12 +12,12 @@ namespace ftl
     constexpr static bool always_false = false;
 
     template <typename T, typename First, typename... Dims>
-    constexpr static bool each_convertible_to(First, Dims... d) noexcept
+    constexpr static bool each_convertible_to() noexcept
     {
         if constexpr (not std::is_convertible_v<First, T>)
             return false;
         if constexpr (sizeof...(Dims))
-            return each_convertible_to<T>(d...);
+            return each_convertible_to<T, Dims...>();
 
         return true;
     }
