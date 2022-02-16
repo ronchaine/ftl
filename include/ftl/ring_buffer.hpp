@@ -11,7 +11,11 @@
 # include <stdexcept>
 # include <memory>
 # include <cassert>
+# define FTL_EXCEPT_RING_BUFFER_FULL   std::out_of_range("write to full ring buffer")
+# define FTL_EXCEPT_RING_BUFFER_EMPTY  std::out_of_range("read from empty ring buffer")
 #else
+# define FTL_EXCEPT_RING_BUFFER_FULL
+# define FTL_EXCEPT_RING_BUFFER_EMPTY
 // TODO:  we probably want our own assert since this is not in
 // standard either, both gcc and clang provide it in freestanding
 // though (at least for x86_64-linux-*)
@@ -318,7 +322,7 @@ namespace ftl
                 if (is_full()) {
                     if constexpr(not allow_overwrite) {
                         #ifdef __cpp_exceptions
-                            throw std::out_of_range("ring buffer full");
+                            throw FTL_EXCEPT_RING_BUFFER_FULL;
                         #endif
                         assert(not is_full());
                     }
@@ -335,7 +339,7 @@ namespace ftl
 
             constexpr T&& read_delete() {
                 #ifdef __cpp_exceptions
-                    if (is_empty()) throw std::out_of_range("read from empty ring buffer");
+                    if (is_empty()) throw FTL_EXCEPT_RING_BUFFER_EMPTY;
                 #endif
                 assert(not is_empty());
 
@@ -352,7 +356,7 @@ namespace ftl
 
             constexpr T read_copy_delete() {
                 #ifdef __cpp_exceptions
-                    if (is_empty()) throw std::out_of_range("read from empty ring buffer");
+                    if (is_empty()) throw FTL_EXCEPT_RING_BUFFER_EMPTY;
                 #endif
                 assert(not is_empty());
 
