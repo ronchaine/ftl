@@ -8,7 +8,7 @@
 #if __STDC_HOSTED__ == 1
 # define FTL_DEFAULT_ALLOCATOR std::allocator<T>
 #else
-# define FTL_DEFAULT_ALLOCATOR ftl::static_storage<64>
+# define FTL_DEFAULT_ALLOCATOR ftl::static_storage<32>
 #endif
 
 // I don't know how standard this is, but it allows to check

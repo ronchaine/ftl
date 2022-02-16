@@ -54,7 +54,7 @@ storage.  Has rudimentary iterator support as well.
 If exceptions are enabled in compiler, `ring_buffer::pop()` will
 throw `out_of_range` if trying to read from empty array.
 
-Uses `ftl::static_storage<128>` as default "Allocator" on freestanding
+Uses `ftl::static_storage<32>` as default "Allocator" on freestanding
 
 
 Licence
