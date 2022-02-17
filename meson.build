@@ -11,5 +11,6 @@ ftl_dep = declare_dependency(
 )
 
 if meson.is_subproject() == false
+  add_project_arguments(['-pedantic', '-Werror', '-Wno-missing-braces'], language : 'cpp')
   subdir('tests')
 endif

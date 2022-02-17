@@ -147,7 +147,7 @@ namespace ftl
             return ref.data_array[cindex * ref.dim_size[Depth - 1] + index];
         }
 
-        constexpr auto&& operator[](std::size_t index) const && noexcept requires (Depth + 1 < sizeof...(Dimensions)) {
+        constexpr auto operator[](std::size_t index) const && noexcept requires (Depth + 1 < sizeof...(Dimensions)) {
             return array_access_proxy<Depth+1, IsConst>(ref, index + (cindex * ref.dim_size[Depth-1]));
         }
     };
@@ -155,8 +155,6 @@ namespace ftl
     template <typename T, std::size_t... Dimensions>
     constexpr void array<T, Dimensions...>::fill(const T& value) noexcept(std::is_nothrow_copy_constructible_v<T>)
     {
-        // TODO: make this sane, this is probably slow af unless the compiler
-        //       figures out some optimisation here
         for (T& e : data_array)
             e = value;
     }

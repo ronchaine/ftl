@@ -71,33 +71,86 @@ TEST_SUITE("ftl::array") {
     }
 
     TEST_CASE("No memory overhead over similar C-style array") {
+        int c_int2x1[2];
         int c_int2x2[2][2];
+
+        ftl::array<int, 2> int2x1;
+
         ftl::array<int, 2, 2> int2x2;
 
+        CHECK(sizeof(int2x1) == sizeof(c_int2x1));
         CHECK(sizeof(int2x2) == sizeof(c_int2x2));
     }
 
+    TEST_CASE("Memory ordering matches C array") {
+        int c_int2x2[2][2];
+        int* c_int_as_array = reinterpret_cast<int*>(c_int2x2);
+        c_int_as_array[0] = 0;
+        c_int_as_array[1] = 1;
+        c_int_as_array[2] = 2;
+        c_int_as_array[3] = 3;
+
+        ftl::array<int, 2, 2> int2x2 { 0, 1, 2, 3 };
+
+        CHECK(c_int2x2[0][0] == int2x2[0][0]);
+        CHECK(c_int2x2[0][1] == int2x2[0][1]);
+        CHECK(c_int2x2[1][0] == int2x2[1][0]);
+        CHECK(c_int2x2[1][1] == int2x2[1][1]);
+
+        int* ftl_array_as_int_ptr = reinterpret_cast<int*>(&int2x2[0][0]);
+
+        CHECK(c_int_as_array[0] == ftl_array_as_int_ptr[0]);
+        CHECK(c_int_as_array[1] == ftl_array_as_int_ptr[1]);
+        CHECK(c_int_as_array[2] == ftl_array_as_int_ptr[2]);
+        CHECK(c_int_as_array[3] == ftl_array_as_int_ptr[3]);
+    }
+
     TEST_CASE("Multidimensional access overhead") {
-        using counter_type = ftl_test::counted_ctr_dtr<"array-access-0">;
-        ftl::array<counter_type, 2, 2> mdarray;
+        SUBCASE("Two-dimensional case") {
+            using counter_type = ftl_test::counted_ctr_dtr<"array-access-0">;
+            ftl::array<counter_type, 2, 2> mdarray;
 
-        REQUIRE(counter_type::default_constructed == 4);
-        REQUIRE(counter_type::copy_constructed == 0);
-        REQUIRE(counter_type::move_constructed == 0);
-        REQUIRE(counter_type::destroyed == 0);
+            REQUIRE(counter_type::default_constructed == 4);
+            REQUIRE(counter_type::copy_constructed == 0);
+            REQUIRE(counter_type::move_constructed == 0);
+            REQUIRE(counter_type::destroyed == 0);
 
 
-        counter_type retrieve_copy = mdarray[1][1];
-        CHECK(counter_type::default_constructed == 4);
-        CHECK(counter_type::copy_constructed == 1); // no additional copies
-        CHECK(counter_type::move_constructed == 0);
-        CHECK(counter_type::destroyed == 0);
+            counter_type retrieve_copy = mdarray[1][1];
+            CHECK(counter_type::default_constructed == 4);
+            CHECK(counter_type::copy_constructed == 1); // no additional copies
+            CHECK(counter_type::move_constructed == 0);
+            CHECK(counter_type::destroyed == 0);
 
-        counter_type retrieve_move = FTL_MOVE(mdarray[1][1]);
-        CHECK(counter_type::default_constructed == 4);
-        CHECK(counter_type::copy_constructed == 1); // no additional copies
-        CHECK(counter_type::move_constructed == 1); // no additional moves
-        CHECK(counter_type::destroyed == 0);
+            counter_type retrieve_move = FTL_MOVE(mdarray[1][1]);
+            CHECK(counter_type::default_constructed == 4);
+            CHECK(counter_type::copy_constructed == 1); // no additional copies
+            CHECK(counter_type::move_constructed == 1); // no additional moves
+            CHECK(counter_type::destroyed == 0);
+        }
+
+        SUBCASE("Three-dimensional case") {
+            using counter_type = ftl_test::counted_ctr_dtr<"array-access-1">;
+            ftl::array<counter_type, 2, 2, 2> mdarray;
+
+            REQUIRE(counter_type::default_constructed == 8);
+            REQUIRE(counter_type::copy_constructed == 0);
+            REQUIRE(counter_type::move_constructed == 0);
+            REQUIRE(counter_type::destroyed == 0);
+
+
+            counter_type retrieve_copy = mdarray[1][1][1];
+            CHECK(counter_type::default_constructed == 8);
+            CHECK(counter_type::copy_constructed == 1); // no additional copies
+            CHECK(counter_type::move_constructed == 0);
+            CHECK(counter_type::destroyed == 0);
+
+            counter_type retrieve_move = FTL_MOVE(mdarray[1][1][1]);
+            CHECK(counter_type::default_constructed == 8);
+            CHECK(counter_type::copy_constructed == 1); // no additional copies
+            CHECK(counter_type::move_constructed == 1); // no additional moves
+            CHECK(counter_type::destroyed == 0);
+        }
     }
 }
 /*
