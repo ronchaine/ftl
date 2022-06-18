@@ -26,5 +26,18 @@ ringbuffer_tests = executable(
   dependencies: [ftl_dep]
 )
 
+result_test_sources = [
+  'result/result.cpp'
+]
+
+result_tests = executable(
+  'test_result',
+  test_runner_source,
+  result_test_sources,
+  dependencies: [ftl_dep]
+)
+
 test('array', array_tests)
 test('ring buffer', ringbuffer_tests)
+test('result', result_tests)
+

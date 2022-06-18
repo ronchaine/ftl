@@ -3,6 +3,12 @@
 
 #include <type_traits>
 
+#ifdef __cpp_exceptions
+# define FTL_THROW_OR_PANIC(x) throw(x)
+#else
+# define FTL_THROW_OR_PANIC(x) std::abort()
+#endif
+
 namespace ftl
 {
     struct no_init_tag_t {};
