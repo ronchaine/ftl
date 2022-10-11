@@ -1,3 +1,9 @@
+This repository will not be updated
+===================================
+(https://codeberg.org/ananas/ftl) will be the canonical repository
+for future updates since I'm moving my active public repositories
+there in time.
+
 Freestanding template library
 =============================
 Provides freestanding-compatible template types for common use cases.
